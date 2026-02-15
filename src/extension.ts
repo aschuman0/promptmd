@@ -5,24 +5,32 @@ import { PromptEditorProvider } from './promptEditor/provider';
 const MD_PATTERN = '*.md';
 const PROMPT_PY_PATTERN = '*prompt*.py';
 
+const MD_VIEW_TYPE = 'promptmd.markdownEditor';
+const PROMPT_VIEW_TYPE = 'promptmd.promptEditor';
+
 /** Sync workbench.editorAssociations with promptmd.markdownEditorDefault and promptmd.promptEditorDefault. */
 function syncEditorAssociations(): void {
   const config = vscode.workspace.getConfiguration();
-  const promptmd = config.get<boolean>('promptmd.markdownEditorDefault');
-  const promptPy = config.get<boolean>('promptmd.promptEditorDefault');
+  const markdownDefault = config.get<boolean>('promptmd.markdownEditorDefault') === true;
+  const promptDefault = config.get<boolean>('promptmd.promptEditorDefault') === true;
   const associations = config.get<Record<string, string>>('workbench.editorAssociations') ?? {};
   const next = { ...associations };
-  if (promptmd === true) {
-    next[MD_PATTERN] = 'promptmd.markdownEditor';
+  if (markdownDefault) {
+    next[MD_PATTERN] = MD_VIEW_TYPE;
   } else {
     delete next[MD_PATTERN];
   }
-  if (promptPy === true) {
-    next[PROMPT_PY_PATTERN] = 'promptmd.promptEditor';
+  if (promptDefault) {
+    next[PROMPT_PY_PATTERN] = PROMPT_VIEW_TYPE;
   } else {
     delete next[PROMPT_PY_PATTERN];
   }
-  config.update('workbench.editorAssociations', next, vscode.ConfigurationTarget.Global);
+  const changed =
+    (associations[MD_PATTERN] ?? null) !== (next[MD_PATTERN] ?? null) ||
+    (associations[PROMPT_PY_PATTERN] ?? null) !== (next[PROMPT_PY_PATTERN] ?? null);
+  if (changed) {
+    config.update('workbench.editorAssociations', next, vscode.ConfigurationTarget.Global);
+  }
 }
 
 /** Registers custom editors for *prompt*.py and .md files. */

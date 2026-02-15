@@ -11,6 +11,7 @@
     "Other"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onCustomEditor:promptmd.promptEditor",
     "onCustomEditor:promptmd.markdownEditor"
   ],

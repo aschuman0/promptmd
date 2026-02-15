@@ -38,6 +38,25 @@ A VS Code / Cursor extension that provides **custom editors** for:
 
 ---
 
+## Settings
+
+Configure in **Settings** (JSON or UI) under the `promptmd` scope.
+
+| Setting | Description | Default |
+|--------|-------------|---------|
+| **promptmd.editorWidth** | Editor width: `constrained` (122ch max) or `full`. | `constrained` |
+| **promptmd.placeholderHighlightStyle** | How to highlight f-string placeholders: `both` (background + left border), `background` only, or `leftLine` only. | `both` |
+| **promptmd.placeholderValidColor** | Color accent for **valid** placeholders: `default` (theme), `blue`, `green`, or `purple`. | `default` |
+| **promptmd.placeholderInvalidColor** | Color accent for **invalid/unknown** placeholders: `default` (theme), `amber`, `red`, or `orange`. | `default` |
+| **promptmd.tokenCounterModel** | Tokenizer for the format bar count: `cl100k_base` (GPT-4/3.5) or `o200k_base` (GPT-4o). | `cl100k_base` |
+| **promptmd.promptVariablePattern** | Regex for which top-level variable names are prompt variables (e.g. `".*_PROMPT$"`). | `.*` |
+| **promptmd.markdownEditorDefault** | Use Markdown Editor (PromptMD) as the default for `.md` files. When enabled, updates `workbench.editorAssociations` so `.md` files open in the Markdown Editor by default. | `false` |
+| **promptmd.promptEditorDefault** | Use Prompt Editor as the default for `*prompt*.py` files. When enabled, updates `workbench.editorAssociations` so matching files open in the Prompt Editor by default. | `false` |
+
+The extension applies the default-editor settings on startup and when you change them; no reload required. Placeholder style and color settings apply when the webview is loaded—reopen the editor or reload the window to see those changes.
+
+---
+
 ## Usage
 
 ### Opening files

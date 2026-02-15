@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **F-string placeholder highlight options** (Prompt Editor)
+  - **Placeholder highlight style:** `promptmd.placeholderHighlightStyle` — choose how placeholders are highlighted: background only, left border only, or both (default).
+  - **Valid placeholder color:** `promptmd.placeholderValidColor` — accent for valid placeholders: default (theme), blue, green, or purple.
+  - **Invalid placeholder color:** `promptmd.placeholderInvalidColor` — accent for invalid/unknown placeholders: default (theme), amber, red, or orange.
+
+### Changed
+
+- **Default editor settings** — `promptmd.markdownEditorDefault` and `promptmd.promptEditorDefault` are now fully applied: the extension activates on startup (`onStartupFinished`) and syncs `workbench.editorAssociations` so that when enabled, `.md` and `*prompt*.py` files open in the Markdown Editor and Prompt Editor by default. Settings are re-applied when you change them (no reload required). Writes to `workbench.editorAssociations` only when the effective association for these patterns actually changes.
+
 ## [0.1.0] - 2026-02-15
 
 ### Added
