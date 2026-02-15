@@ -1,0 +1,39 @@
+{
+  "name": "promptmd",
+  "displayName": "PromptMD",
+  "description": "Custom editor for *prompt*.py files: WYSIWYG edit of triple-quoted Markdown strings with f-string placeholder highlighting.",
+  "version": "0.1.0",
+  "publisher": "promptmd",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onCustomEditor:promptmd.promptEditor"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "promptmd.promptEditor",
+        "displayName": "Prompt Editor",
+        "selector": [
+          {
+            "filenamePattern": "*prompt*.py"
+          }
+        ],
+        "priority": "default"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.74.0",
+    "typescript": "^5.3.0"
+  }
+}
