@@ -9,7 +9,7 @@ SYSTEM_PROMPT = """You are a helpful assistant.
 
 &nbsp;
 
-You are a helpful assistant that is good at editing markdown files. This
+You are a helpful assistant that is good at editing markdown files.
 
 &nbsp;"""
 
@@ -23,4 +23,4 @@ With multiple lines.
 
 test for a {{fstring}} """
 
-NEW_PROMPT = """&nbsp;"""
+NEW_PROMPT = """Hello, World!"""

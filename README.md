@@ -1,44 +1,59 @@
 # PromptMD
 
-A VS Code / Cursor extension that provides a **custom editor** for Python prompt files (`*prompt*.py`). Edit triple-quoted Markdown prompt strings in a tabbed, WYSIWYG-style editor with live preview and f-string placeholder highlighting.
+A VS Code / Cursor extension that provides **custom editors** for:
+
+- **Prompt files** (`*prompt*.py`) — Edit triple-quoted Markdown prompt strings in a tabbed, WYSIWYG editor with f-string placeholder highlighting.
+- **Markdown files** (`.md`) — Edit any Markdown file in the same rich editor (headings, lists, code, etc.) with a format bar and live preview.
 
 ---
 
 ## Features
 
-### Custom editor
+### Prompt Editor (`*prompt*.py`)
 
-- **File pattern:** Any file whose name matches `*prompt*.py` (e.g. `prompts.py`, `system_prompt.py`, `my_prompt.py`) opens in the Prompt Editor by default.
-- **One tab per variable:** Each top-level triple-quoted string (or f-string) assignment in the file gets its own tab. Switch between prompts without touching the raw Python.
+| Feature | Description |
+|--------|-------------|
+| **File pattern** | Files matching `*prompt*.py` (e.g. `prompts.py`, `system_prompt.py`) open in the Prompt Editor by default. |
+| **One tab per variable** | Each top-level triple-quoted or f-string assignment gets its own tab; switch between prompts without editing raw Python. |
+| **Rich Markdown** | Format bar: headings (H1–H3), bold, italic, blockquote, inline code, code blocks, bullet and ordered lists. Content is saved back as valid Python. |
+| **F-string placeholders** | `{user_name}` and similar are recognized and styled. Valid names (in scope in the file) use one style; unknown names use a warning style. |
+| **Placeholder as you type** | Typing `}` after `{something}` turns it into a placeholder node immediately. |
+| **Add / rename variables** | **+** in the format bar adds a variable (Python identifier); pencil icon on a tab renames it. Names are validated. |
+| **Save / revert** | Save rewrites the `.py` file in place and appends new variables; revert reloads from disk. Respects **Files: Auto Save**. |
 
-### Editing experience
+### Markdown Editor (`.md`)
 
-- **Rich Markdown editing** via a format bar: headings (H1–H3), bold, italic, blockquote, inline code, code blocks, bullet and ordered lists. Content is edited as Markdown and saved back as valid Python.
-- **F-string placeholders** like `{user_name}` or `{task_id}` are recognized and shown with distinct styling. Valid placeholders (names that exist in the file’s scope) are highlighted in one style; placeholders that don’t match an imported or defined name are shown in a warning style so you can spot typos or missing variables.
-- **Placeholder recognition as you type:** When you type a closing `}` after `{something}`, the span is immediately turned into a placeholder node and styled—no need to reopen the file.
-- **Add and rename variables:** Use the **+** button in the format bar to add a new prompt variable (you’ll be prompted for a Python identifier). Use the pencil icon on a tab to rename that variable. Names are validated (Python identifier, no duplicates).
+| Feature | Description |
+|--------|-------------|
+| **File pattern** | Any `.md` file can open in the Markdown Editor (PromptMD). |
+| **Single-document view** | One editor per file; no tabs or variable UI. Same rich editing as the Prompt Editor. |
+| **Format bar** | Headings, bold, italic, blockquote, code, code block, bullet and ordered lists. |
+| **Save / revert** | Save and revert work as usual; content is written back to the `.md` file. |
 
-### Save and revert
+### Shared
 
-- **Save** (e.g. **Cmd+S** / **Ctrl+S**) rewrites the file: prompt content is updated in place, and new variables are appended. Non-prompt code and structure are preserved. F-strings are written with `{{` and `}}` where needed.
-- **Revert** (e.g. **File: Revert File**) reloads the file from disk and discards in-memory changes.
-- **Autosave:** The extension respects VS Code’s **Files: Auto Save** setting (`off`, `afterDelay`, `onFocusChange`, `onWindowChange`). The document is marked dirty on edit; VS Code decides when to call save.
+- **TipTap-based editor** — Same WYSIWYG engine and format bar for both editors.
+- **Reopen in another editor** — Use “Reopen Editor With…” to switch to the default text editor or another custom editor if needed.
 
 ---
 
 ## Usage
 
-### Opening a prompt file
+### Opening files
 
-1. Open a file that matches `*prompt*.py`. It should open in the Prompt Editor automatically.
-2. If it opens in the default text editor instead, you can **Reopen Editor With…** and choose **Prompt Editor**.
+- **Prompt files:** Open a file matching `*prompt*.py`; it should open in the **Prompt Editor** automatically. If not, use **Reopen Editor With…** → **Prompt Editor**.
+- **Markdown files:** Open a `.md` file; it can open in the **Markdown Editor (PromptMD)**. If it opens in the default editor, use **Reopen Editor With…** → **Markdown Editor (PromptMD)**.
 
-### Editing
+### Editing (Prompt Editor)
 
 - **Tabs:** Click a tab to switch between prompt variables. The active tab’s content is shown in the editor below the format bar.
-- **Format bar:** Use the dropdown and buttons (bold, italic, quote, code, code block, lists) to format the current prompt. The **+** button on the right adds a new prompt variable.
+- **Format bar:** Use the dropdown and buttons (bold, italic, quote, code, code block, lists) to format the current prompt. The **+** button adds a new prompt variable (prompt files only).
 - **Placeholders:** Type `{variable_name}` in the text. When you type the closing `}`, it’s recognized as a placeholder. If `variable_name` is in scope (imported or defined in the same file), it’s highlighted as valid; otherwise it’s shown with a warning style.
 - **Rename a variable:** Hover over a tab and click the pencil icon, then enter the new name (must be a valid Python identifier and unique).
+
+### Editing (Markdown Editor)
+
+- **Single pane:** One Markdown file, one editor. Use the format bar (headings, bold, italic, quote, code, lists) as in the Prompt Editor. Tabs and variable UI are hidden.
 
 ### Saving and reverting
 
@@ -91,7 +106,7 @@ You can package the extension as a `.vsix` file and install it locally (no marke
    - **CLI (VS Code):** `code --install-extension promptmd-0.1.0.vsix`
    - **CLI (Cursor):** `cursor --install-extension promptmd-0.1.0.vsix`
 
-3. Reload the editor if prompted. Open a `*prompt*.py` file to confirm the Prompt Editor opens.
+3. Reload the editor if prompted. Open a `*prompt*.py` or `.md` file to confirm the Prompt Editor or Markdown Editor opens.
 
 ### Upgrading to a new version
 
@@ -125,7 +140,7 @@ npm run build:webview
 
 1. Open this folder in VS Code/Cursor.
 2. Press **F5** or use **Run and Debug** → **Launch Extension**.
-3. A new window opens with the extension loaded. Open a file matching `*prompt*.py` (e.g. from the `examples/` folder) to use the Prompt Editor.
+3. A new window opens with the extension loaded. Open a `*prompt*.py` file (e.g. from `examples/`) for the Prompt Editor, or a `.md` file for the Markdown Editor.
 
 ### Auto-reload during development
 
@@ -141,12 +156,14 @@ Then press **F5** to launch the Extension Development Host. After you change ext
 
 | Path | Purpose |
 |------|--------|
-| `src/extension.ts` | Extension entry; registers the custom editor provider. |
-| `src/promptEditor/provider.ts` | Custom editor provider: open/resolve/save/revert, webview messaging (init, edit, add/rename variable, variablesUpdated). |
-| `src/promptEditor/document.ts` | In-memory document: entries (name, rawValue, isFString, offsets), setVariableContent, addEntry, renameEntry, updateSavedContent, reloadFromDisk. |
+| `src/extension.ts` | Extension entry; registers both Prompt and Markdown custom editor providers. |
+| `src/promptEditor/provider.ts` | Prompt editor provider: open/resolve/save/revert, webview messaging (init, edit, add/rename variable, variablesUpdated). |
+| `src/promptEditor/document.ts` | In-memory prompt document: entries (name, rawValue, isFString, offsets), setVariableContent, addEntry, renameEntry, updateSavedContent, reloadFromDisk. |
 | `src/promptEditor/parser.ts` | Python parsing: `parsePromptVariables()` (triple-quoted/f-string assignments), `getNamesInScope()` (imports, assignments, def/class for placeholder validation). |
 | `src/promptEditor/save.ts` | `rebuildPyFile()`: replace name/value spans, append new entries; escapes content and f-string braces. |
-| `src/promptEditor/getWebviewContent.ts` | Builds the webview HTML (tabs, panels, state, message handling) and injects the script. |
+| `src/promptEditor/getWebviewContent.ts` | Builds the webview HTML (tabs, panels, state, message handling) for both editors; `mode: 'prompt'` or `'markdown'` toggles UI (tabs vs single doc). |
+| `src/markdownEditor/provider.ts` | Markdown editor provider: open/resolve/save/revert, single-document content messaging. |
+| `src/markdownEditor/document.ts` | In-memory markdown document: getContent, setContent, updateSavedContent, reloadFromDisk. |
 | `webview/editor.ts` | TipTap editor bundle: Placeholder node (with validation styling), Markdown, format bar, input rule for `{...}`; built to `media/editor.js`. |
 | `examples/` | Sample `*prompt*.py` files for manual testing (see `examples/README.md`). |
 
