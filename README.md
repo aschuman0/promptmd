@@ -33,6 +33,7 @@ A VS Code / Cursor extension that provides **custom editors** for:
 ### Shared
 
 - **TipTap-based editor** — Same WYSIWYG engine and format bar for both editors.
+- **Token count** — The format bar shows an approximate token count for the current prompt or markdown. The count uses an OpenAI-style tokenizer (accurate for e.g. GPT-4, GPT-3.5); other models (e.g. Claude) may differ slightly. No API or model access is used; counting is done locally in the editor.
 - **Reopen in another editor** — Use “Reopen Editor With…” to switch to the default text editor or another custom editor if needed.
 
 ---

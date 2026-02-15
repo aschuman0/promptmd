@@ -49,4 +49,4 @@ CHECKLIST_PROMPT = """# Pre-flight Checklist
 3. Confirm all sections are present
 """
 
-example_new_add = """This is an example new add. I want to add a {variable} here."""
+EXAMPLE_NEW_ADD = """This is an example new add. I want to add a {variable} here."""

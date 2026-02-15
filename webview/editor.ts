@@ -6,6 +6,14 @@
 import { Editor, Node, nodeInputRule } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
+import { Tiktoken } from 'js-tiktoken/lite';
+import cl100k_base from 'js-tiktoken/ranks/cl100k_base';
+
+let tiktokenInstance: Tiktoken | null = null;
+function getTokenCount(text: string): number {
+  if (!tiktokenInstance) tiktokenInstance = new Tiktoken(cl100k_base);
+  return tiktokenInstance.encode(text).length;
+}
 
 function placeholderVariableName(raw: string): string {
   if (raw.length >= 2 && raw[0] === '{' && raw[raw.length - 1] === '}') {
@@ -136,7 +144,10 @@ export function initTiptapEditor(options: InitTiptapEditorOptions): () => void {
         const md = typeof (editor as unknown as { getMarkdown: () => string }).getMarkdown === 'function'
           ? (editor as unknown as { getMarkdown: () => string }).getMarkdown()
           : undefined;
-        if (md !== undefined) onMarkdownChange(md);
+        if (md !== undefined) {
+          onMarkdownChange(md);
+          updateTokenCount(md);
+        }
       } catch {
         // Markdown extension may not be ready; ignore.
       }
@@ -231,6 +242,18 @@ export function initTiptapEditor(options: InitTiptapEditorOptions): () => void {
   toolbarContainer.appendChild(btn(icons.codeBlock, 'codeBlock', 'Code block', () => editor.chain().focus().toggleCodeBlock().run()));
   toolbarContainer.appendChild(btn(icons.bulletList, 'bulletList', 'Bullet list', () => editor.chain().focus().toggleBulletList().run()));
   toolbarContainer.appendChild(btn(icons.orderedList, 'orderedList', 'Numbered list', () => editor.chain().focus().toggleOrderedList().run()));
+
+  const tokenCountEl = document.createElement('span');
+  tokenCountEl.className = 'token-count';
+  tokenCountEl.setAttribute('title', 'Approximate token count for OpenAI-style models (e.g. GPT-4)');
+  tokenCountEl.textContent = '— tokens';
+  toolbarContainer.appendChild(tokenCountEl);
+
+  function updateTokenCount(markdown: string): void {
+    const n = getTokenCount(markdown);
+    tokenCountEl.textContent = `${n.toLocaleString()} tokens`;
+  }
+  updateTokenCount(initialMarkdown || '');
 
   if (onReopenInEditor || onAddVariable) {
     const spacer = document.createElement('div');

@@ -158,7 +158,7 @@ export function getWebviewContent(
       flex-wrap: wrap;
       align-items: center;
       gap: 4px;
-      padding: 4px 0;
+      padding: 4px 8px 4px 0;
       border-bottom: 1px solid var(--vscode-input-border);
       margin-bottom: 8px;
       flex-shrink: 0;
@@ -189,6 +189,12 @@ export function getWebviewContent(
     .format-reopen-btn { margin-left: 4px; }
     .format-add-btn {
       margin-left: auto;
+    }
+    .token-count {
+      font-size: 0.85em;
+      color: var(--vscode-descriptionForeground);
+      margin-left: 8px;
+      padding: 4px 8px;
     }
     .promptmd-tiptap-editor {
       min-height: 160px;
