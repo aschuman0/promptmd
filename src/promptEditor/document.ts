@@ -27,6 +27,18 @@ function parsedToEntries(parsed: PromptVariable[]): PromptEntry[] {
   }));
 }
 
+/** Filter parsed variables by promptmd.promptVariablePattern (regex on variable name). */
+function filterByVariablePattern(parsed: PromptVariable[]): PromptVariable[] {
+  const pattern = vscode.workspace.getConfiguration('promptmd').get<string>('promptVariablePattern') ?? '.*';
+  let re: RegExp;
+  try {
+    re = new RegExp(pattern);
+  } catch {
+    re = /.*/;
+  }
+  return parsed.filter((p) => re.test(p.name));
+}
+
 export class PromptDocument implements vscode.CustomDocument {
   readonly uri: vscode.Uri;
   readonly entries: PromptEntry[];
@@ -35,7 +47,9 @@ export class PromptDocument implements vscode.CustomDocument {
   static async create(uri: vscode.Uri): Promise<PromptDocument> {
     const data = await vscode.workspace.fs.readFile(uri);
     const text = new TextDecoder('utf-8').decode(data);
-    const entries = parsedToEntries(parsePromptVariables(text));
+    const parsed = parsePromptVariables(text);
+    const filtered = filterByVariablePattern(parsed);
+    const entries = parsedToEntries(filtered);
     return new PromptDocument(uri, text, entries);
   }
 
@@ -84,7 +98,9 @@ export class PromptDocument implements vscode.CustomDocument {
   updateSavedContent(newFileText: string): void {
     this._savedFileText = newFileText;
     this.entries.length = 0;
-    this.entries.push(...parsedToEntries(parsePromptVariables(newFileText)));
+    const parsed = parsePromptVariables(newFileText);
+    const filtered = filterByVariablePattern(parsed);
+    this.entries.push(...parsedToEntries(filtered));
   }
 
   /** Reload from disk and re-parse (for revert). */
@@ -93,7 +109,9 @@ export class PromptDocument implements vscode.CustomDocument {
     const text = new TextDecoder('utf-8').decode(data);
     this._savedFileText = text;
     this.entries.length = 0;
-    this.entries.push(...parsedToEntries(parsePromptVariables(text)));
+    const parsed = parsePromptVariables(text);
+    const filtered = filterByVariablePattern(parsed);
+    this.entries.push(...parsedToEntries(filtered));
   }
 
   dispose(): void {

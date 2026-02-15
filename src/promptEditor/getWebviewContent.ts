@@ -2,8 +2,14 @@ import * as vscode from 'vscode';
 
 export type WebviewEditorMode = 'prompt' | 'markdown';
 
+export type EditorWidth = 'constrained' | 'full';
+
 export interface GetWebviewContentOptions {
   mode?: WebviewEditorMode;
+  /** From promptmd.editorWidth; when 'full', no max-width. */
+  editorWidth?: EditorWidth;
+  /** From promptmd.tokenCounterModel; e.g. cl100k_base, o200k_base. */
+  tokenCounterModel?: string;
 }
 
 /**
@@ -17,8 +23,19 @@ export function getWebviewContent(
   options?: GetWebviewContentOptions
 ): string {
   const mode = options?.mode ?? 'prompt';
+  const config = vscode.workspace.getConfiguration('promptmd');
+  const editorWidth = options?.editorWidth ?? (config.get<string>('editorWidth') as EditorWidth | undefined) ?? 'constrained';
+  const tokenCounterModel = options?.tokenCounterModel ?? config.get<string>('tokenCounterModel') ?? 'cl100k_base';
+  const placeholderStyle = config.get<string>('placeholderHighlightStyle') ?? 'both';
+  const placeholderValidColor = config.get<string>('placeholderValidColor') ?? 'default';
+  const placeholderInvalidColor = config.get<string>('placeholderInvalidColor') ?? 'default';
   const scriptSrc = scriptUri.toString();
   const bodyDataMode = mode === 'markdown' ? 'markdown' : 'prompt';
+  const bodyDataWidth = editorWidth === 'full' ? 'full' : 'constrained';
+  const bodyDataTokenModel = tokenCounterModel;
+  const bodyDataPlaceholderStyle = placeholderStyle;
+  const bodyDataPlaceholderValid = placeholderValidColor;
+  const bodyDataPlaceholderInvalid = placeholderInvalidColor;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -117,6 +134,9 @@ export function getWebviewContent(
       margin-left: auto;
       margin-right: auto;
     }
+    .editor-outer.editor-outer--full {
+      max-width: none;
+    }
     .editor-wrap {
       flex: 1;
       min-height: 120px;
@@ -146,6 +166,41 @@ export function getWebviewContent(
     .placeholder-inline.placeholder-invalid {
       background: var(--vscode-inputValidation-warningBackground, rgba(255, 193, 0, 0.15));
       border-left-color: var(--vscode-inputValidation-warningBorder, rgba(255, 193, 0, 0.8));
+      color: var(--vscode-editor-foreground);
+    }
+    body[data-placeholder-style="background"] .placeholder-inline { border-left: none; }
+    body[data-placeholder-style="leftLine"] .placeholder-inline {
+      background: transparent;
+      border-radius: 0;
+    }
+    body[data-placeholder-valid-color="blue"] .placeholder-inline:not(.placeholder-invalid) {
+      background: rgba(0, 122, 204, 0.15);
+      border-left-color: #007acc;
+      color: var(--vscode-editor-foreground);
+    }
+    body[data-placeholder-valid-color="green"] .placeholder-inline:not(.placeholder-invalid) {
+      background: rgba(22, 130, 93, 0.15);
+      border-left-color: #16825d;
+      color: var(--vscode-editor-foreground);
+    }
+    body[data-placeholder-valid-color="purple"] .placeholder-inline:not(.placeholder-invalid) {
+      background: rgba(92, 45, 145, 0.15);
+      border-left-color: #5c2d91;
+      color: var(--vscode-editor-foreground);
+    }
+    body[data-placeholder-invalid-color="amber"] .placeholder-inline.placeholder-invalid {
+      background: rgba(255, 193, 0, 0.15);
+      border-left-color: rgba(255, 193, 0, 0.8);
+      color: var(--vscode-editor-foreground);
+    }
+    body[data-placeholder-invalid-color="red"] .placeholder-inline.placeholder-invalid {
+      background: rgba(200, 50, 50, 0.15);
+      border-left-color: #c83232;
+      color: var(--vscode-editor-foreground);
+    }
+    body[data-placeholder-invalid-color="orange"] .placeholder-inline.placeholder-invalid {
+      background: rgba(230, 130, 50, 0.15);
+      border-left-color: #e68232;
       color: var(--vscode-editor-foreground);
     }
     .empty-state {
@@ -218,7 +273,7 @@ export function getWebviewContent(
     body[data-mode="markdown"] .tabs { display: none !important; }
   </style>
 </head>
-<body data-mode="${bodyDataMode}">
+<body data-mode="${bodyDataMode}" data-editor-width="${bodyDataWidth}" data-token-counter-model="${bodyDataTokenModel}" data-placeholder-style="${bodyDataPlaceholderStyle}" data-placeholder-valid-color="${bodyDataPlaceholderValid}" data-placeholder-invalid-color="${bodyDataPlaceholderInvalid}">
   <script src="${scriptSrc}"></script>
   <div id="loading" class="loading-state">Loading…</div>
   <div id="emptyState" class="empty-state" style="display: none;">
@@ -232,7 +287,9 @@ export function getWebviewContent(
     (function() {
       const vscode = acquireVsCodeApi();
       const mode = document.body.getAttribute('data-mode') || 'prompt';
-      let state = { mode: mode, variables: [], validPlaceholderNames: [] };
+      const editorWidth = document.body.getAttribute('data-editor-width') || 'constrained';
+      const tokenCounterModel = document.body.getAttribute('data-token-counter-model') || 'cl100k_base';
+      let state = { mode: mode, variables: [], validPlaceholderNames: [], editorWidth: editorWidth, tokenCounterModel: tokenCounterModel };
       let activeIndex = 0;
 
       function hideLoading() {
@@ -262,7 +319,7 @@ export function getWebviewContent(
         const editorEl = document.createElement('div');
         editorEl.className = 'editor';
         const outer = document.createElement('div');
-        outer.className = 'editor-outer';
+        outer.className = 'editor-outer' + (state.editorWidth === 'full' ? ' editor-outer--full' : '');
         outer.appendChild(formatBar);
         outer.appendChild(wrap);
         if (typeof window.initTiptapEditor !== 'function') {
@@ -292,6 +349,7 @@ export function getWebviewContent(
             vscode.postMessage({ type: 'reopenInEditor' });
           },
           validPlaceholderNames: state.validPlaceholderNames,
+          tokenCounterModel: state.tokenCounterModel,
         });
         panel._destroyTiptap = destroy;
         wrap.appendChild(editorEl);
@@ -368,6 +426,8 @@ export function getWebviewContent(
           });
           state.validPlaceholderNames = msg.validPlaceholderNames || [];
         }
+        if (msg.editorWidth != null) state.editorWidth = msg.editorWidth;
+        if (msg.tokenCounterModel != null) state.tokenCounterModel = msg.tokenCounterModel;
         activeIndex = 0;
         render();
       }
@@ -387,6 +447,8 @@ export function getWebviewContent(
             activeIndex = Math.max(0, state.variables.length - 1);
           }
         }
+        if (msg.editorWidth != null) state.editorWidth = msg.editorWidth;
+        if (msg.tokenCounterModel != null) state.tokenCounterModel = msg.tokenCounterModel;
         render();
       }
       window.addEventListener('message', function(event) {

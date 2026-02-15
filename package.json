@@ -16,6 +16,66 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "PromptMD",
+      "properties": {
+        "promptmd.promptFilePattern": {
+          "type": "string",
+          "default": "*prompt*.py",
+          "description": "Glob pattern for prompt Python files. Which files open in the Prompt Editor is fixed in the extension; this is for display and future commands."
+        },
+        "promptmd.markdownFilePattern": {
+          "type": "string",
+          "default": "*.md",
+          "description": "Glob pattern for Markdown files. Which files open in the Markdown Editor is fixed in the extension; this is for display and future commands."
+        },
+        "promptmd.promptVariablePattern": {
+          "type": "string",
+          "default": ".*",
+          "description": "Regex for which top-level variable names to treat as prompt variables (e.g. \".*_PROMPT$\")."
+        },
+        "promptmd.markdownEditorDefault": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use Markdown Editor (PromptMD) as default for .md files."
+        },
+        "promptmd.promptEditorDefault": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use Prompt Editor as default for *prompt*.py files."
+        },
+        "promptmd.tokenCounterModel": {
+          "type": "string",
+          "enum": ["cl100k_base", "o200k_base"],
+          "default": "cl100k_base",
+          "description": "Tokenizer for the format bar token count: cl100k_base (GPT-4/3.5), o200k_base (GPT-4o)."
+        },
+        "promptmd.editorWidth": {
+          "type": "string",
+          "enum": ["constrained", "full"],
+          "default": "constrained",
+          "description": "Editor width: constrained (122ch max) or full."
+        },
+        "promptmd.placeholderHighlightStyle": {
+          "type": "string",
+          "enum": ["both", "background", "leftLine"],
+          "default": "both",
+          "description": "How to highlight f-string placeholders: background only, left border only, or both."
+        },
+        "promptmd.placeholderValidColor": {
+          "type": "string",
+          "enum": ["default", "blue", "green", "purple"],
+          "default": "default",
+          "description": "Color accent for valid placeholders; default uses the editor theme."
+        },
+        "promptmd.placeholderInvalidColor": {
+          "type": "string",
+          "enum": ["default", "amber", "red", "orange"],
+          "default": "default",
+          "description": "Color accent for invalid or unknown placeholders; default uses the editor theme."
+        }
+      }
+    },
     "customEditors": [
       {
         "viewType": "promptmd.promptEditor",

@@ -7,6 +7,14 @@ import { rebuildPyFile } from './save';
 const PY_IDENT_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const PY_IDENT_ERROR = 'Use a valid Python identifier (letters, numbers, underscore).';
 
+function getEditorConfig(): { editorWidth: string; tokenCounterModel: string } {
+  const config = vscode.workspace.getConfiguration('promptmd');
+  return {
+    editorWidth: config.get<string>('editorWidth') ?? 'constrained',
+    tokenCounterModel: config.get<string>('tokenCounterModel') ?? 'cl100k_base',
+  };
+}
+
 function getWebviewPayload(document: PromptDocument): {
   variables: { name: string; content: string; isFString: boolean }[];
   validPlaceholderNames: string[];
@@ -67,14 +75,27 @@ export class PromptEditorProvider implements vscode.CustomEditorProvider<PromptD
     webviewPanel.webview.html = getWebviewContent(webviewPanel.webview, scriptUri);
 
     const { variables, validPlaceholderNames } = getWebviewPayload(document);
-    webviewPanel.webview.postMessage({ type: 'init', variables, validPlaceholderNames });
+    const editorConfig = getEditorConfig();
+    webviewPanel.webview.postMessage({
+      type: 'init',
+      variables,
+      validPlaceholderNames,
+      editorWidth: editorConfig.editorWidth,
+      tokenCounterModel: editorConfig.tokenCounterModel,
+    });
 
     const broadcastVariables = () => {
       const panels = this._webviewPanels.get(key);
       if (panels) {
         const payload = getWebviewPayload(document);
+        const editorConfig = getEditorConfig();
         for (const panel of panels) {
-          panel.webview.postMessage({ type: 'variablesUpdated', ...payload });
+          panel.webview.postMessage({
+            type: 'variablesUpdated',
+            ...payload,
+            editorWidth: editorConfig.editorWidth,
+            tokenCounterModel: editorConfig.tokenCounterModel,
+          });
         }
       }
     };
@@ -86,9 +107,13 @@ export class PromptEditorProvider implements vscode.CustomEditorProvider<PromptD
           return;
         }
         if (msg.type === 'webviewReady') {
+          const payload = getWebviewPayload(document);
+          const editorConfig = getEditorConfig();
           webviewPanel.webview.postMessage({
             type: 'init',
-            ...getWebviewPayload(document),
+            ...payload,
+            editorWidth: editorConfig.editorWidth,
+            tokenCounterModel: editorConfig.tokenCounterModel,
           });
           return;
         }
@@ -150,8 +175,14 @@ export class PromptEditorProvider implements vscode.CustomEditorProvider<PromptD
     const panels = this._webviewPanels.get(document.uri.toString());
     if (panels) {
       const payload = getWebviewPayload(document);
+      const editorConfig = getEditorConfig();
       for (const panel of panels) {
-        panel.webview.postMessage({ type: 'variablesUpdated', ...payload });
+        panel.webview.postMessage({
+          type: 'variablesUpdated',
+          ...payload,
+          editorWidth: editorConfig.editorWidth,
+          tokenCounterModel: editorConfig.tokenCounterModel,
+        });
       }
     }
   }
@@ -164,8 +195,14 @@ export class PromptEditorProvider implements vscode.CustomEditorProvider<PromptD
     const panels = this._webviewPanels.get(document.uri.toString());
     if (panels) {
       const payload = getWebviewPayload(document);
+      const editorConfig = getEditorConfig();
       for (const panel of panels) {
-        panel.webview.postMessage({ type: 'revert', ...payload });
+        panel.webview.postMessage({
+          type: 'revert',
+          ...payload,
+          editorWidth: editorConfig.editorWidth,
+          tokenCounterModel: editorConfig.tokenCounterModel,
+        });
       }
     }
   }

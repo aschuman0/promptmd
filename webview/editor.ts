@@ -8,11 +8,15 @@ import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
 import { Tiktoken } from 'js-tiktoken/lite';
 import cl100k_base from 'js-tiktoken/ranks/cl100k_base';
+import o200k_base from 'js-tiktoken/ranks/o200k_base';
 
-let tiktokenInstance: Tiktoken | null = null;
-function getTokenCount(text: string): number {
-  if (!tiktokenInstance) tiktokenInstance = new Tiktoken(cl100k_base);
-  return tiktokenInstance.encode(text).length;
+const tiktokenByModel: Record<string, Tiktoken> = {};
+function getTokenCount(text: string, model: string): number {
+  const key = model === 'o200k_base' ? 'o200k_base' : 'cl100k_base';
+  if (!tiktokenByModel[key]) {
+    tiktokenByModel[key] = new Tiktoken(key === 'o200k_base' ? o200k_base : cl100k_base);
+  }
+  return tiktokenByModel[key].encode(text).length;
 }
 
 function placeholderVariableName(raw: string): string {
@@ -105,6 +109,8 @@ export interface InitTiptapEditorOptions {
   onReopenInEditor?: () => void;
   /** Names in scope in the Python file; only these get valid placeholder styling. */
   validPlaceholderNames?: string[];
+  /** Tokenizer for count: cl100k_base or o200k_base. */
+  tokenCounterModel?: string;
 }
 
 export function initTiptapEditor(options: InitTiptapEditorOptions): () => void {
@@ -117,6 +123,7 @@ export function initTiptapEditor(options: InitTiptapEditorOptions): () => void {
     onAddVariable,
     onReopenInEditor,
     validPlaceholderNames = [],
+    tokenCounterModel = 'cl100k_base',
   } = options;
 
   const validNames = new Set(validPlaceholderNames);
@@ -250,7 +257,7 @@ export function initTiptapEditor(options: InitTiptapEditorOptions): () => void {
   toolbarContainer.appendChild(tokenCountEl);
 
   function updateTokenCount(markdown: string): void {
-    const n = getTokenCount(markdown);
+    const n = getTokenCount(markdown, tokenCounterModel);
     tokenCountEl.textContent = `${n.toLocaleString()} tokens`;
   }
   updateTokenCount(initialMarkdown || '');

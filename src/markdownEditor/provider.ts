@@ -2,6 +2,14 @@ import * as vscode from 'vscode';
 import { getWebviewContent } from '../promptEditor/getWebviewContent';
 import { MarkdownDocument } from './document';
 
+function getEditorConfig(): { editorWidth: string; tokenCounterModel: string } {
+  const config = vscode.workspace.getConfiguration('promptmd');
+  return {
+    editorWidth: config.get<string>('editorWidth') ?? 'constrained',
+    tokenCounterModel: config.get<string>('tokenCounterModel') ?? 'cl100k_base',
+  };
+}
+
 /** Custom editor provider for .md files. Single-document view, same rich editor, no tabs or variable UI. */
 export class MarkdownEditorProvider implements vscode.CustomEditorProvider<MarkdownDocument> {
   private readonly _context: vscode.ExtensionContext;
@@ -47,11 +55,14 @@ export class MarkdownEditorProvider implements vscode.CustomEditorProvider<Markd
     );
     webviewPanel.webview.html = getWebviewContent(webviewPanel.webview, scriptUri, { mode: 'markdown' });
 
+    const editorConfig = getEditorConfig();
     webviewPanel.webview.postMessage({
       type: 'init',
       mode: 'markdown',
       content: document.getContent(),
       validPlaceholderNames: [],
+      editorWidth: editorConfig.editorWidth,
+      tokenCounterModel: editorConfig.tokenCounterModel,
     });
 
     webviewPanel.webview.onDidReceiveMessage(
@@ -61,11 +72,14 @@ export class MarkdownEditorProvider implements vscode.CustomEditorProvider<Markd
           return;
         }
         if (msg.type === 'webviewReady') {
+          const editorConfig = getEditorConfig();
           webviewPanel.webview.postMessage({
             type: 'init',
             mode: 'markdown',
             content: document.getContent(),
             validPlaceholderNames: [],
+            editorWidth: editorConfig.editorWidth,
+            tokenCounterModel: editorConfig.tokenCounterModel,
           });
           return;
         }
@@ -87,8 +101,16 @@ export class MarkdownEditorProvider implements vscode.CustomEditorProvider<Markd
     document.updateSavedContent(content);
     const panels = this._webviewPanels.get(document.uri.toString());
     if (panels) {
+      const editorConfig = getEditorConfig();
       for (const panel of panels) {
-        panel.webview.postMessage({ type: 'variablesUpdated', mode: 'markdown', content, validPlaceholderNames: [] });
+        panel.webview.postMessage({
+          type: 'variablesUpdated',
+          mode: 'markdown',
+          content,
+          validPlaceholderNames: [],
+          editorWidth: editorConfig.editorWidth,
+          tokenCounterModel: editorConfig.tokenCounterModel,
+        });
       }
     }
   }
@@ -101,8 +123,15 @@ export class MarkdownEditorProvider implements vscode.CustomEditorProvider<Markd
     const panels = this._webviewPanels.get(document.uri.toString());
     if (panels) {
       const content = document.getContent();
+      const editorConfig = getEditorConfig();
       for (const panel of panels) {
-        panel.webview.postMessage({ type: 'revert', mode: 'markdown', content });
+        panel.webview.postMessage({
+          type: 'revert',
+          mode: 'markdown',
+          content,
+          editorWidth: editorConfig.editorWidth,
+          tokenCounterModel: editorConfig.tokenCounterModel,
+        });
       }
     }
   }
