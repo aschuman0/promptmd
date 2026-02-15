@@ -1,8 +1,27 @@
 import * as vscode from 'vscode';
 import { PromptDocument } from './document';
 import { getWebviewContent } from './getWebviewContent';
+import { getNamesInScope } from './parser';
 import { rebuildPyFile } from './save';
 
+const PY_IDENT_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+const PY_IDENT_ERROR = 'Use a valid Python identifier (letters, numbers, underscore).';
+
+function getWebviewPayload(document: PromptDocument): {
+  variables: { name: string; content: string; isFString: boolean }[];
+  validPlaceholderNames: string[];
+} {
+  return {
+    variables: document.entries.map((e) => ({
+      name: e.name,
+      content: e.rawValue,
+      isFString: e.isFString,
+    })),
+    validPlaceholderNames: getNamesInScope(document.savedFileText),
+  };
+}
+
+/** Custom editor provider for *prompt*.py files. */
 export class PromptEditorProvider implements vscode.CustomEditorProvider<PromptDocument> {
   private readonly _context: vscode.ExtensionContext;
   private readonly _onDidChangeCustomDocument = new vscode.EventEmitter<
@@ -42,21 +61,78 @@ export class PromptEditorProvider implements vscode.CustomEditorProvider<PromptD
       enableScripts: true,
       localResourceRoots: [this._context.extensionUri],
     };
-    webviewPanel.webview.html = getWebviewContent();
+    const scriptUri = webviewPanel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this._context.extensionUri, 'media', 'editor.js')
+    );
+    webviewPanel.webview.html = getWebviewContent(webviewPanel.webview, scriptUri);
 
-    const variables = document.entries.map((e) => ({
-      name: e.name,
-      content: e.rawValue,
-      isFString: e.isFString,
-    }));
-    webviewPanel.webview.postMessage({ type: 'init', variables });
+    const { variables, validPlaceholderNames } = getWebviewPayload(document);
+    webviewPanel.webview.postMessage({ type: 'init', variables, validPlaceholderNames });
 
-    webviewPanel.webview.onDidReceiveMessage((msg: { type: string; variableName?: string; content?: string }) => {
-      if (msg.type === 'edit' && msg.variableName != null && msg.content != null) {
-        document.setVariableContent(msg.variableName, msg.content);
-        this._onDidChangeCustomDocument.fire({ document });
+    const broadcastVariables = () => {
+      const panels = this._webviewPanels.get(key);
+      if (panels) {
+        const payload = getWebviewPayload(document);
+        for (const panel of panels) {
+          panel.webview.postMessage({ type: 'variablesUpdated', ...payload });
+        }
       }
-    });
+    };
+
+    webviewPanel.webview.onDidReceiveMessage(
+      async (msg: { type: string; variableName?: string; content?: string; newName?: string }) => {
+        if (msg.type === 'webviewReady') {
+          webviewPanel.webview.postMessage({
+            type: 'init',
+            ...getWebviewPayload(document),
+          });
+          return;
+        }
+        if (msg.type === 'edit' && msg.variableName != null && msg.content != null) {
+          document.setVariableContent(msg.variableName, msg.content);
+          this._onDidChangeCustomDocument.fire({ document });
+          return;
+        }
+        if (msg.type === 'addVariable') {
+          const name = await vscode.window.showInputBox({
+            prompt: 'New variable name (Python identifier)',
+            value: 'NEW_PROMPT',
+            validateInput: (value) => {
+              if (!PY_IDENT_REGEX.test(value)) return PY_IDENT_ERROR;
+              if (document.entries.some((e) => e.name === value)) {
+                return 'A variable with this name already exists.';
+              }
+              return null;
+            },
+          });
+          if (name) {
+            document.addEntry(name);
+            this._onDidChangeCustomDocument.fire({ document });
+            broadcastVariables();
+          }
+          return;
+        }
+        if (msg.type === 'renameVariable' && msg.variableName != null) {
+          const newName = await vscode.window.showInputBox({
+            prompt: 'Rename variable',
+            value: msg.variableName,
+            validateInput: (value) => {
+              if (!PY_IDENT_REGEX.test(value)) return PY_IDENT_ERROR;
+              if (value !== msg.variableName && document.entries.some((e) => e.name === value)) {
+                return 'A variable with this name already exists.';
+              }
+              return null;
+            },
+          });
+          if (newName && newName !== msg.variableName) {
+            document.renameEntry(msg.variableName, newName);
+            this._onDidChangeCustomDocument.fire({ document });
+            broadcastVariables();
+          }
+          return;
+        }
+      }
+    );
   }
 
   async saveCustomDocument(
@@ -67,6 +143,13 @@ export class PromptEditorProvider implements vscode.CustomEditorProvider<PromptD
     const bytes = new TextEncoder().encode(newContent);
     await vscode.workspace.fs.writeFile(document.uri, bytes);
     document.updateSavedContent(newContent);
+    const panels = this._webviewPanels.get(document.uri.toString());
+    if (panels) {
+      const payload = getWebviewPayload(document);
+      for (const panel of panels) {
+        panel.webview.postMessage({ type: 'variablesUpdated', ...payload });
+      }
+    }
   }
 
   async revertCustomDocument(
@@ -74,16 +157,11 @@ export class PromptEditorProvider implements vscode.CustomEditorProvider<PromptD
     _cancellation: vscode.CancellationToken
   ): Promise<void> {
     await document.reloadFromDisk();
-    const variables = document.entries.map((e) => ({
-      name: e.name,
-      content: e.rawValue,
-      isFString: e.isFString,
-    }));
-    const key = document.uri.toString();
-    const panels = this._webviewPanels.get(key);
+    const panels = this._webviewPanels.get(document.uri.toString());
     if (panels) {
+      const payload = getWebviewPayload(document);
       for (const panel of panels) {
-        panel.webview.postMessage({ type: 'revert', variables });
+        panel.webview.postMessage({ type: 'revert', ...payload });
       }
     }
   }

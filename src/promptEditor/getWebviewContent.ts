@@ -1,10 +1,11 @@
-/**
- * Builds the HTML for the prompt editor webview.
- * Inline script sets up tabs and a WYSIWYG-style editor (contenteditable with markdown-aware behavior)
- * and placeholders highlighted. Sends edits to the extension via postMessage.
- */
+import * as vscode from 'vscode';
 
-export function getWebviewContent(): string {
+/**
+ * Builds the HTML for the prompt editor webview: layout, styles, and inline script.
+ * Script loads TipTap from scriptUri, handles init/revert/variablesUpdated, and requests state on load (webviewReady).
+ */
+export function getWebviewContent(_webview: vscode.Webview, scriptUri: vscode.Uri): string {
+  const scriptSrc = scriptUri.toString();
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,10 +35,16 @@ export function getWebviewContent(): string {
     .tabs {
       display: flex;
       flex-direction: row;
+      align-items: center;
       gap: 2px;
       border-bottom: 1px solid var(--vscode-panel-border);
       margin-bottom: 8px;
       flex-shrink: 0;
+    }
+    .tab-wrap {
+      display: flex;
+      align-items: center;
+      gap: 2px;
     }
     .tab {
       padding: 6px 12px;
@@ -52,6 +59,24 @@ export function getWebviewContent(): string {
       border-bottom-color: var(--vscode-focusBorder);
       font-weight: 500;
     }
+    .tab-rename {
+      padding: 2px 4px;
+      background: transparent;
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      color: var(--vscode-descriptionForeground);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.6;
+    }
+    .tab-rename:hover {
+      color: var(--vscode-foreground);
+      background: var(--vscode-toolbar-hoverBackground);
+      opacity: 1;
+    }
+    .tab-wrap:hover .tab-rename { opacity: 0.8; }
     #panels {
       flex: 1;
       min-height: 0;
@@ -83,32 +108,72 @@ export function getWebviewContent(): string {
       word-wrap: break-word;
     }
     .editor:empty::before { content: attr(data-placeholder); color: var(--vscode-input-placeholderForeground); }
-    .preview {
-      flex-shrink: 0;
-      margin-top: 8px;
-      padding: 12px;
-      border: 1px solid var(--vscode-input-border);
-      border-radius: 4px;
-      background: var(--vscode-editor-inactiveSelectionBackground);
-      min-height: 80px;
-      max-height: 40%;
-      overflow: auto;
-      font-size: 0.95em;
-    }
-    .preview h1 { font-size: 1.4em; margin: 0.5em 0; }
-    .preview h2 { font-size: 1.2em; margin: 0.5em 0; }
-    .preview h3 { font-size: 1.1em; margin: 0.5em 0; }
-    .preview p { margin: 0.4em 0; }
-    .preview ul, .preview ol { margin: 0.4em 0; padding-left: 1.5em; }
-    .preview code { background: var(--vscode-textCodeBlock-background); padding: 1px 4px; border-radius: 2px; }
     .placeholder-inline {
-      background: var(--vscode-textBlockQuote-background);
-      color: var(--vscode-editorWidget-foreground);
-      padding: 1px 4px;
+      background: var(--vscode-inputValidation-infoBackground, var(--vscode-textBlockQuote-background));
+      color: var(--vscode-inputValidation-infoForeground, var(--vscode-textLink-foreground, var(--vscode-editor-foreground)));
+      border-left: 3px solid var(--vscode-inputValidation-infoBorder, var(--vscode-focusBorder, #007acc));
+      padding: 2px 6px;
       border-radius: 3px;
       font-family: var(--vscode-editor-font-family);
+      font-weight: 500;
+    }
+    .placeholder-inline.placeholder-invalid {
+      background: var(--vscode-inputValidation-warningBackground, rgba(255, 193, 0, 0.15));
+      border-left-color: var(--vscode-inputValidation-warningBorder, rgba(255, 193, 0, 0.8));
+      color: var(--vscode-editor-foreground);
     }
     .empty-state {
+      padding: 24px;
+      text-align: center;
+      color: var(--vscode-descriptionForeground);
+    }
+    .format-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--vscode-input-border);
+      margin-bottom: 8px;
+      flex-shrink: 0;
+    }
+    .format-btn, .format-select {
+      padding: 6px 8px;
+      font-size: 0.9em;
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: 1px solid var(--vscode-button-border);
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .format-btn {
+      min-width: 32px;
+      min-height: 28px;
+    }
+    .format-btn:hover, .format-select:hover {
+      background: var(--vscode-button-secondaryHoverBackground);
+    }
+    .format-btn.active {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+    }
+    .promptmd-tiptap-editor {
+      min-height: 160px;
+      outline: none;
+    }
+    .promptmd-tiptap-editor p { margin: 0.25em 0; }
+    .promptmd-tiptap-editor h1 { font-size: 1.4em; margin: 0.5em 0; }
+    .promptmd-tiptap-editor h2 { font-size: 1.2em; margin: 0.5em 0; }
+    .promptmd-tiptap-editor h3 { font-size: 1.1em; margin: 0.5em 0; }
+    .promptmd-tiptap-editor ul, .promptmd-tiptap-editor ol { margin: 0.4em 0; padding-left: 1.5em; }
+    .promptmd-tiptap-editor blockquote { border-left: 3px solid var(--vscode-textBlockQuote-border); margin: 0.5em 0; padding-left: 1em; color: var(--vscode-textPreformat-foreground); }
+    .promptmd-tiptap-editor code { background: var(--vscode-textCodeBlock-background); padding: 0.15em 0.4em; border-radius: 3px; font-family: var(--vscode-editor-font-family); font-size: 0.9em; }
+    .promptmd-tiptap-editor pre { background: var(--vscode-textCodeBlock-background); padding: 0.75em 1em; border-radius: 4px; overflow-x: auto; margin: 0.5em 0; }
+    .promptmd-tiptap-editor pre code { padding: 0; background: none; }
+    .loading-state {
       padding: 24px;
       text-align: center;
       color: var(--vscode-descriptionForeground);
@@ -116,6 +181,8 @@ export function getWebviewContent(): string {
   </style>
 </head>
 <body>
+  <script src="${scriptSrc}"></script>
+  <div id="loading" class="loading-state">Loading…</div>
   <div id="emptyState" class="empty-state" style="display: none;">
     No prompt variables found in this file. Add top-level triple-quoted string assignments (e.g. <code>VAR = """..."""</code>).
   </div>
@@ -126,69 +193,22 @@ export function getWebviewContent(): string {
   <script>
     (function() {
       const vscode = acquireVsCodeApi();
-      let state = { variables: [] };
+      let state = { variables: [], validPlaceholderNames: [] };
       let activeIndex = 0;
-      let editDebounce = null;
-      const DEBOUNCE_MS = 400;
 
+      function hideLoading() {
+        const el = document.getElementById('loading');
+        if (el) el.style.display = 'none';
+      }
       function showEmpty() {
+        hideLoading();
         document.getElementById('emptyState').style.display = 'block';
         document.getElementById('main').style.display = 'none';
       }
       function showMain() {
+        hideLoading();
         document.getElementById('emptyState').style.display = 'none';
         document.getElementById('main').style.display = 'flex';
-      }
-
-      function renderContentWithPlaceholders(text) {
-        const div = document.createElement('div');
-        let i = 0;
-        const re = /\{[^}]*\}/g;
-        let m;
-        let last = 0;
-        while ((m = re.exec(text)) !== null) {
-          if (m.index > last) {
-            div.appendChild(document.createTextNode(text.slice(last, m.index)));
-          }
-          const span = document.createElement('span');
-          span.className = 'placeholder-inline';
-          span.textContent = m[0];
-          span.contentEditable = 'false';
-          span.setAttribute('data-placeholder', m[0]);
-          div.appendChild(span);
-          last = m.index + m[0].length;
-        }
-        if (last < text.length) div.appendChild(document.createTextNode(text.slice(last)));
-        return div;
-      }
-
-      function getTextFromNode(node) {
-        let out = '';
-        function walk(n) {
-          if (n.nodeType === Node.TEXT_NODE) {
-            out += n.textContent;
-          } else if (n.classList && n.classList.contains('placeholder-inline')) {
-            out += n.getAttribute('data-placeholder') || n.textContent;
-          } else {
-            for (const c of n.childNodes) walk(c);
-          }
-        }
-        walk(node);
-        return out;
-      }
-
-      function syncEditorToVariable(index) {
-        const v = state.variables[index];
-        if (!v) return;
-        const panel = document.getElementById('panel-' + index);
-        if (!panel) return;
-        const editor = panel.querySelector('.editor');
-        if (!editor) return;
-        const content = getTextFromNode(editor);
-        if (content !== v.content) {
-          v.content = content;
-          vscode.postMessage({ type: 'edit', variableName: v.name, content: content });
-        }
       }
 
       function buildEditor(index) {
@@ -196,49 +216,49 @@ export function getWebviewContent(): string {
         const panel = document.createElement('div');
         panel.id = 'panel-' + index;
         panel.className = 'panel' + (index === activeIndex ? ' active' : '');
+        const formatBar = document.createElement('div');
+        formatBar.className = 'format-bar';
         const wrap = document.createElement('div');
         wrap.className = 'editor-wrap';
-        const editor = document.createElement('div');
-        editor.className = 'editor';
-        editor.contentEditable = 'true';
-        editor.setAttribute('data-placeholder', 'Enter markdown...');
-        const contentWithPlaceholders = renderContentWithPlaceholders(v.content || '');
-        editor.appendChild(contentWithPlaceholders);
-        editor.addEventListener('input', function() {
-          clearTimeout(editDebounce);
-          editDebounce = setTimeout(function() {
-            syncEditorToVariable(index);
-          }, DEBOUNCE_MS);
-        });
-        editor.addEventListener('blur', function() { syncEditorToVariable(index); });
-        const preview = document.createElement('div');
-        preview.className = 'preview';
-        preview.innerHTML = 'Preview';
-        function updatePreview() {
-          const raw = getTextFromNode(editor);
-          preview.innerHTML = simpleMarkdownToHtml(raw);
+        const editorEl = document.createElement('div');
+        editorEl.className = 'editor';
+        if (typeof window.initTiptapEditor !== 'function') {
+          editorEl.textContent = 'Loading editor...';
+          wrap.appendChild(editorEl);
+          panel.appendChild(formatBar);
+          panel.appendChild(wrap);
+          return panel;
         }
-        editor.addEventListener('input', updatePreview);
-        editor.addEventListener('blur', updatePreview);
-        updatePreview();
-        wrap.appendChild(editor);
+        const destroy = window.initTiptapEditor({
+          toolbarContainer: formatBar,
+          editorContainer: editorEl,
+          initialMarkdown: v.content || '',
+          variableName: v.name,
+          onMarkdownChange: function(md) {
+            v.content = md;
+            vscode.postMessage({ type: 'edit', variableName: v.name, content: md });
+          },
+          onAddVariable: function() {
+            vscode.postMessage({ type: 'addVariable' });
+          },
+          validPlaceholderNames: state.validPlaceholderNames,
+        });
+        panel._destroyTiptap = destroy;
+        wrap.appendChild(editorEl);
+        panel.appendChild(formatBar);
         panel.appendChild(wrap);
-        panel.appendChild(preview);
         return panel;
       }
-      function simpleMarkdownToHtml(md) {
-        if (!md) return '';
-        let s = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        s = s.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-        s = s.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-        s = s.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-        s = s.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
-        s = s.replace(/\\*([^*]+)\\*/g, '<em>$1</em>');
-        s = s.replace(/\`([^\`]+)\`/g, '<code>$1</code>');
-        s = s.replace(/^\\- (.+)$/gm, '<li>$1</li>');
-        s = s.replace(/\\n\\n/g, '</p><p>');
-        s = s.replace(/\\n/g, '<br>');
-        return '<p>' + s + '</p>';
+
+      function makeRenameIcon() {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('width', '14');
+        svg.setAttribute('height', '14');
+        svg.setAttribute('fill', 'currentColor');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.innerHTML = '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>';
+        return svg;
       }
 
       function render() {
@@ -249,21 +269,38 @@ export function getWebviewContent(): string {
         showMain();
         const tabsEl = document.getElementById('tabs');
         const panelsEl = document.getElementById('panels');
+        Array.from(panelsEl.querySelectorAll('.panel')).forEach(function(p) {
+          if (p._destroyTiptap) p._destroyTiptap();
+        });
         tabsEl.innerHTML = '';
         panelsEl.innerHTML = '';
         state.variables.forEach(function(v, i) {
+          const wrap = document.createElement('div');
+          wrap.className = 'tab-wrap';
           const tab = document.createElement('button');
+          tab.type = 'button';
           tab.className = 'tab' + (i === activeIndex ? ' active' : '');
           tab.textContent = v.name;
+          tab.setAttribute('title', 'Switch to ' + v.name);
+          const renameBtn = document.createElement('button');
+          renameBtn.type = 'button';
+          renameBtn.className = 'tab-rename';
+          renameBtn.setAttribute('title', 'Rename variable');
+          renameBtn.appendChild(makeRenameIcon());
+          renameBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            vscode.postMessage({ type: 'renameVariable', variableName: v.name });
+          });
           tab.addEventListener('click', function() {
-            syncEditorToVariable(activeIndex);
             document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
             document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
             tab.classList.add('active');
             document.getElementById('panel-' + i).classList.add('active');
             activeIndex = i;
           });
-          tabsEl.appendChild(tab);
+          wrap.appendChild(tab);
+          wrap.appendChild(renameBtn);
+          tabsEl.appendChild(wrap);
           panelsEl.appendChild(buildEditor(i));
         });
       }
@@ -274,11 +311,32 @@ export function getWebviewContent(): string {
           state.variables = (msg.variables || []).map(function(v) {
             return { name: v.name, content: v.content, isFString: v.isFString };
           });
+          state.validPlaceholderNames = msg.validPlaceholderNames || [];
           activeIndex = 0;
           render();
         }
+        if (msg.type === 'variablesUpdated') {
+          const prevLen = state.variables.length;
+          state.variables = (msg.variables || []).map(function(v) {
+            return { name: v.name, content: v.content, isFString: v.isFString };
+          });
+          state.validPlaceholderNames = msg.validPlaceholderNames || [];
+          if (state.variables.length > prevLen) {
+            activeIndex = state.variables.length - 1;
+          } else if (activeIndex >= state.variables.length) {
+            activeIndex = Math.max(0, state.variables.length - 1);
+          }
+          render();
+        }
       });
-      render();
+      function sendReadyWhenEditorLoaded() {
+        if (typeof window.initTiptapEditor === 'function') {
+          vscode.postMessage({ type: 'webviewReady' });
+          return;
+        }
+        setTimeout(sendReadyWhenEditorLoaded, 30);
+      }
+      sendReadyWhenEditorLoaded();
     })();
   </script>
 </body>

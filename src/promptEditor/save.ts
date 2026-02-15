@@ -23,19 +23,44 @@ function escapeForPythonTripleQuoted(
   return out;
 }
 
+interface Replacement {
+  start: number;
+  end: number;
+  text: string;
+}
+
 /**
- * Rebuilds the full Python file content by replacing each prompt variable's
- * value span with the new content. Replaces in reverse order by offset so
- * that indices remain valid.
+ * Rebuilds the full Python file content: replaces name and value spans for
+ * existing entries, appends new entries (startOffset < 0).
  */
 export function rebuildPyFile(savedFileText: string, entries: PromptEntry[]): string {
-  const sorted = [...entries].sort((a, b) => b.startOffset - a.startOffset);
+  const replacements: Replacement[] = [];
+
+  for (const entry of entries) {
+    if (entry.nameStart != null && entry.nameEnd != null && entry.nameStart >= 0) {
+      replacements.push({ start: entry.nameStart, end: entry.nameEnd, text: entry.name });
+    }
+    if (entry.startOffset >= 0 && entry.endOffset >= 0) {
+      const escaped = escapeForPythonTripleQuoted(entry.rawValue, true, entry.isFString);
+      const literal = entry.isFString ? `f"""${escaped}"""` : `"""${escaped}"""`;
+      replacements.push({ start: entry.startOffset, end: entry.endOffset, text: literal });
+    }
+  }
+
+  // Apply replacements from end to start so earlier indices remain valid.
+  replacements.sort((a, b) => b.start - a.start);
   let result = savedFileText;
-  for (const entry of sorted) {
+  for (const r of replacements) {
+    result = result.slice(0, r.start) + r.text + result.slice(r.end);
+  }
+
+  const newEntries = entries.filter((e) => e.startOffset < 0);
+  for (const entry of newEntries) {
     const escaped = escapeForPythonTripleQuoted(entry.rawValue, true, entry.isFString);
     const literal = entry.isFString ? `f"""${escaped}"""` : `"""${escaped}"""`;
-    result =
-      result.slice(0, entry.startOffset) + literal + result.slice(entry.endOffset);
+    const block = `\n\n${entry.name} = ${literal}\n`;
+    result = result.trimEnd() + block;
   }
+
   return result;
 }

@@ -1,11 +1,10 @@
 import * as vscode from 'vscode';
 import { PromptEditorProvider } from './promptEditor/provider';
 
+/** Registers the custom editor for *prompt*.py files. */
 export function activate(context: vscode.ExtensionContext): void {
-  const viewType = 'promptmd.promptEditor';
-  const provider = new PromptEditorProvider(context);
   context.subscriptions.push(
-    vscode.window.registerCustomEditorProvider(viewType, provider)
+    vscode.window.registerCustomEditorProvider('promptmd.promptEditor', new PromptEditorProvider(context))
   );
 }
 

@@ -11,6 +11,10 @@ export interface PromptVariable {
   rawValue: string;
   /** True if assignment was f"""...""" or f'''...''' */
   isFString: boolean;
+  /** Start offset of variable name in file */
+  nameStart: number;
+  /** End offset of variable name in file (after last character of name) */
+  nameEnd: number;
   /** Start offset in file (start of the opening quote) */
   startOffset: number;
   /** End offset in file (after closing quote) */
@@ -74,10 +78,11 @@ export function parsePromptVariables(source: string): PromptVariable[] {
     ensureModuleLevel();
     if (i >= len) break;
 
-    const lineStart = i;
+    const nameStart = i;
     const name = readIdentifier();
+    const nameEnd = i;
     if (name === null) {
-      i = lineStart;
+      i = nameStart;
       const nextNewline = source.indexOf('\n', i);
       i = nextNewline === -1 ? len : nextNewline + 1;
       continue;
@@ -128,10 +133,79 @@ export function parsePromptVariables(source: string): PromptVariable[] {
       name,
       rawValue,
       isFString,
+      nameStart,
+      nameEnd,
       startOffset: literalStart,
       endOffset: i,
     });
   }
 
   return results;
+}
+
+const IDENT = /^[a-zA-Z_][a-zA-Z0-9_]*/;
+/** Matches "x as alias" or "module.path as alias"; capture is the alias (simple identifier). */
+const AS_ALIAS_PATTERN = /.+\s+as\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*$/;
+
+/** Parse "a, b as c, os.path as p" style list and add the brought-into-scope names to the set. */
+function addImportNames(names: Set<string>, importListStr: string): void {
+  const parts = importListStr.split(',').map((s) => s.trim());
+  for (const part of parts) {
+    const asMatch = part.match(AS_ALIAS_PATTERN);
+    if (asMatch) {
+      names.add(asMatch[1]);
+    } else {
+      const idMatch = part.match(IDENT);
+      if (idMatch) names.add(idMatch[0]);
+    }
+  }
+}
+
+/**
+ * Returns names that are in module scope: imported, assigned, or defined (def/class).
+ * Used to validate f-string placeholders so only {name} with a real name get highlighted.
+ */
+export function getNamesInScope(source: string): string[] {
+  const names = new Set<string>();
+  const lines = source.split(/\r\n|\r|\n/);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trimStart();
+    const indent = line.length - trimmed.length;
+    if (indent > 0) continue;
+
+    const rest = trimmed;
+
+    if (rest.startsWith('import ')) {
+      addImportNames(names, rest.slice(7));
+      continue;
+    }
+
+    if (rest.startsWith('from ')) {
+      const importIdx = rest.indexOf(' import ');
+      if (importIdx === -1) continue;
+      addImportNames(names, rest.slice(importIdx + 8));
+      continue;
+    }
+
+    const defMatch = rest.match(new RegExp(`^def\\s+(${IDENT.source})\\s*\\(`));
+    if (defMatch) {
+      names.add(defMatch[1]);
+      continue;
+    }
+
+    const classMatch = rest.match(new RegExp(`^class\\s+(${IDENT.source})\\s*[\\(:]`));
+    if (classMatch) {
+      names.add(classMatch[1]);
+      continue;
+    }
+
+    const assignMatch = rest.match(new RegExp(`^(${IDENT.source})\\s*=`));
+    if (assignMatch) {
+      names.add(assignMatch[1]);
+    }
+  }
+
+  return Array.from(names);
 }
