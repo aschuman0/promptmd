@@ -33,11 +33,19 @@ function syncEditorAssociations(): void {
   }
 }
 
+const LOG_CHANNEL_NAME = 'PromptMD';
+
 /** Registers custom editors for *prompt*.py and .md files. */
 export function activate(context: vscode.ExtensionContext): void {
+  const log = vscode.window.createOutputChannel(LOG_CHANNEL_NAME);
+  context.subscriptions.push(log);
   context.subscriptions.push(
-    vscode.window.registerCustomEditorProvider('promptmd.promptEditor', new PromptEditorProvider(context)),
-    vscode.window.registerCustomEditorProvider('promptmd.markdownEditor', new MarkdownEditorProvider(context))
+    vscode.window.registerCustomEditorProvider('promptmd.promptEditor', new PromptEditorProvider(context, log), {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
+    vscode.window.registerCustomEditorProvider('promptmd.markdownEditor', new MarkdownEditorProvider(context, log), {
+      webviewOptions: { retainContextWhenHidden: true },
+    })
   );
   syncEditorAssociations();
   context.subscriptions.push(

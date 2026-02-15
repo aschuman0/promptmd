@@ -31,12 +31,22 @@ interface Replacement {
 
 /**
  * Rebuilds the full Python file content: replaces name and value spans for
- * existing entries, appends new entries (startOffset < 0).
+ * existing entries, appends new entries (startOffset < 0), removes deleted entries.
  */
 export function rebuildPyFile(savedFileText: string, entries: PromptEntry[]): string {
   const replacements: Replacement[] = [];
 
   for (const entry of entries) {
+    if (entry.deleted) {
+      if (
+        entry.nameStart != null &&
+        entry.startOffset >= 0 &&
+        entry.endOffset >= 0
+      ) {
+        replacements.push({ start: entry.nameStart, end: entry.endOffset, text: '' });
+      }
+      continue;
+    }
     if (entry.nameStart != null && entry.nameEnd != null && entry.nameStart >= 0) {
       replacements.push({ start: entry.nameStart, end: entry.nameEnd, text: entry.name });
     }
@@ -54,7 +64,13 @@ export function rebuildPyFile(savedFileText: string, entries: PromptEntry[]): st
     result = result.slice(0, r.start) + r.text + result.slice(r.end);
   }
 
-  const newEntries = entries.filter((e) => e.startOffset < 0);
+  // Collapse 3+ newlines to 2 for tidiness after deletions. Match LF, CR, or CRLF so CRLF files are handled.
+  result = result.replace(/(\r?\n){3,}/g, (match) => {
+    const single = match.startsWith('\r') ? '\r\n' : '\n';
+    return single + single;
+  });
+
+  const newEntries = entries.filter((e) => e.startOffset < 0 && !e.deleted);
   for (const entry of newEntries) {
     const escaped = escapeForPythonTripleQuoted(entry.rawValue, true, entry.isFString);
     const literal = entry.isFString ? `f"""${escaped}"""` : `"""${escaped}"""`;

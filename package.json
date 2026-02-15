@@ -5,15 +5,10 @@
   "version": "0.1.0",
   "publisher": "promptmd",
   "engines": {
-    "vscode": "^1.74.0"
+    "vscode": "^1.75.0"
   },
   "categories": [
     "Other"
-  ],
-  "activationEvents": [
-    "onStartupFinished",
-    "onCustomEditor:promptmd.promptEditor",
-    "onCustomEditor:promptmd.markdownEditor"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -74,6 +69,12 @@
           "enum": ["default", "amber", "red", "orange"],
           "default": "default",
           "description": "Color accent for invalid or unknown placeholders; default uses the editor theme."
+        },
+        "promptmd.editorTypeface": {
+          "type": "string",
+          "enum": ["sansSerif", "serif", "monospace"],
+          "default": "sansSerif",
+          "description": "Typeface for the editor content: sans serif (default), serif, or monospace."
         }
       }
     },
@@ -114,6 +115,10 @@
     "@tiptap/core": "^3.19.0",
     "@tiptap/markdown": "^3.19.0",
     "@tiptap/starter-kit": "^3.19.0",
+    "@tiptap/extension-table": "^3.19.0",
+    "@tiptap/extension-table-row": "^3.19.0",
+    "@tiptap/extension-table-cell": "^3.19.0",
+    "@tiptap/extension-table-header": "^3.19.0",
     "@types/node": "^20.10.0",
     "@types/vscode": "^1.74.0",
     "esbuild": "^0.24.0",

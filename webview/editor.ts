@@ -6,6 +6,7 @@
 import { Editor, Node, nodeInputRule } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
+import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
 import { Tiktoken } from 'js-tiktoken/lite';
 import cl100k_base from 'js-tiktoken/ranks/cl100k_base';
 import o200k_base from 'js-tiktoken/ranks/o200k_base';
@@ -97,6 +98,16 @@ function createPlaceholderExtension(validNames: Set<string>) {
 
 const DEBOUNCE_MS = 400;
 
+/** True if the current selection is inside a table (cursor in a cell). */
+function isCursorInTable(editor: Editor): boolean {
+  const { selection } = editor.state;
+  const { $from } = selection;
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.node(d).type.name === 'table') return true;
+  }
+  return false;
+}
+
 export interface InitTiptapEditorOptions {
   toolbarContainer: HTMLElement;
   editorContainer: HTMLElement;
@@ -131,7 +142,15 @@ export function initTiptapEditor(options: InitTiptapEditorOptions): () => void {
 
   const editor = new Editor({
     element: editorContainer,
-    extensions: [StarterKit, Placeholder, Markdown],
+    extensions: [
+      StarterKit,
+      Placeholder,
+      Table,
+      TableRow,
+      TableCell,
+      TableHeader,
+      Markdown.configure({ markedOptions: { gfm: true } }),
+    ],
     content: initialMarkdown || '',
     contentType: 'markdown',
     editorProps: {
@@ -182,6 +201,13 @@ export function initTiptapEditor(options: InitTiptapEditorOptions): () => void {
     if (blockquote) blockquote.classList.toggle('active', editor.isActive('blockquote'));
     if (code) code.classList.toggle('active', editor.isActive('code'));
     if (codeBlock) codeBlock.classList.toggle('active', editor.isActive('codeBlock'));
+    const inTable = isCursorInTable(editor);
+    const tableTrigger = toolbarContainer.querySelector('.format-table-trigger');
+    if (tableTrigger) tableTrigger.classList.toggle('active', inTable);
+    const tableInTableButtons = toolbarContainer.querySelectorAll('.format-table-in-table');
+    tableInTableButtons.forEach((el) => {
+      (el as HTMLButtonElement).disabled = !inTable;
+    });
   }
 
   editor.on('selectionUpdate', updateToolbarState);
@@ -210,6 +236,7 @@ export function initTiptapEditor(options: InitTiptapEditorOptions): () => void {
     codeBlock: icon('<path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/>'),
     bulletList: icon('<path d="M4 10.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm0-6c-.83 0-1.5.67-1.5 1.5S3.17 7.5 4 7.5 5.5 6.83 5.5 6 4.83 4.5 4 4.5zm0 12c-.83 0-1.5.68-1.5 1.5s.68 1.5 1.5 1.5 1.5-.68 1.5-1.5-.67-1.5-1.5-1.5zM7 19h14v-2H7v2zm0-6h14v-2H7v2zm0-8v2h14V5H7z"/>'),
     orderedList: icon('<path d="M2 17h2v.5H3v1h1v.5H2v1h3v-4H2v1zm1-9h1V4H2v1h1v3zm-1 3h1.8L2 13.1v.9h3v-1H3.2L5 10.9V10H2v1zm5-6v2h14V5H7zm0 14h14v-2H7v2zm0-6h14v-2H7v2z"/>'),
+    table: icon('<path d="M3 3v18h18V3H3zm8 16H5v-6h6v6zm0-8H5V5h6v6zm8 8h-6v-6h6v6zm0-8h-6V5h6v6z"/>'),
   };
   const btn = (content: string | SVGSVGElement, format: string, title: string, fn: () => void) => {
     const b = document.createElement('button');
@@ -249,6 +276,65 @@ export function initTiptapEditor(options: InitTiptapEditorOptions): () => void {
   toolbarContainer.appendChild(btn(icons.codeBlock, 'codeBlock', 'Code block', () => editor.chain().focus().toggleCodeBlock().run()));
   toolbarContainer.appendChild(btn(icons.bulletList, 'bulletList', 'Bullet list', () => editor.chain().focus().toggleBulletList().run()));
   toolbarContainer.appendChild(btn(icons.orderedList, 'orderedList', 'Numbered list', () => editor.chain().focus().toggleOrderedList().run()));
+
+  const tableWrap = document.createElement('div');
+  tableWrap.className = 'format-table-wrap';
+  const tableTrigger = document.createElement('button');
+  tableTrigger.type = 'button';
+  tableTrigger.className = 'format-table-trigger';
+  tableTrigger.setAttribute('title', 'Table');
+  tableTrigger.setAttribute('data-format', 'table');
+  const tableIcon = icon('<path d="M3 3v18h18V3H3zm8 16H5v-6h6v6zm0-8H5V5h6v6zm8 8h-6v-6h6v6zm0-8h-6V5h6v6z"/>');
+  tableTrigger.appendChild(tableIcon);
+  const tableChevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  tableChevron.setAttribute('viewBox', '0 0 24 24');
+  tableChevron.setAttribute('fill', 'currentColor');
+  tableChevron.setAttribute('aria-hidden', 'true');
+  tableChevron.setAttribute('class', 'format-table-chevron');
+  tableChevron.innerHTML = '<path d="M7 10l5 5 5-5z"/>';
+  tableTrigger.appendChild(tableChevron);
+  const tableDropdown = document.createElement('div');
+  tableDropdown.className = 'format-table-dropdown';
+  const addTableItem = (label: string, inTableOnly: boolean, fn: () => void) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    if (inTableOnly) b.classList.add('format-table-in-table');
+    b.addEventListener('click', () => {
+      editor.chain().focus().run();
+      fn();
+      updateToolbarState();
+      tableDropdown.classList.remove('open');
+    });
+    return b;
+  };
+  const sep = () => {
+    const div = document.createElement('div');
+    div.className = 'format-table-sep';
+    return div;
+  };
+  tableDropdown.appendChild(addTableItem('Insert table', false, () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()));
+  tableDropdown.appendChild(sep());
+  tableDropdown.appendChild(addTableItem('Add row above', true, () => editor.chain().focus().addRowBefore().run()));
+  tableDropdown.appendChild(addTableItem('Add row below', true, () => editor.chain().focus().addRowAfter().run()));
+  tableDropdown.appendChild(addTableItem('Delete row', true, () => editor.chain().focus().deleteRow().run()));
+  tableDropdown.appendChild(sep());
+  tableDropdown.appendChild(addTableItem('Add column left', true, () => editor.chain().focus().addColumnBefore().run()));
+  tableDropdown.appendChild(addTableItem('Add column right', true, () => editor.chain().focus().addColumnAfter().run()));
+  tableDropdown.appendChild(addTableItem('Delete column', true, () => editor.chain().focus().deleteColumn().run()));
+  tableTrigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    editor.chain().focus().run();
+    tableDropdown.classList.toggle('open');
+    updateToolbarState();
+  });
+  document.addEventListener('click', (e) => {
+    if (!(e.target as Node).closest?.('.format-table-wrap')) tableDropdown.classList.remove('open');
+  });
+  tableWrap.appendChild(tableTrigger);
+  tableWrap.appendChild(tableDropdown);
+  toolbarContainer.appendChild(tableWrap);
+  updateToolbarState();
 
   const tokenCountEl = document.createElement('span');
   tokenCountEl.className = 'token-count';

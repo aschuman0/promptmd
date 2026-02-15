@@ -13,6 +13,7 @@ function getEditorConfig(): { editorWidth: string; tokenCounterModel: string } {
 /** Custom editor provider for .md files. Single-document view, same rich editor, no tabs or variable UI. */
 export class MarkdownEditorProvider implements vscode.CustomEditorProvider<MarkdownDocument> {
   private readonly _context: vscode.ExtensionContext;
+  private readonly _log: vscode.OutputChannel | undefined;
   private readonly _onDidChangeCustomDocument = new vscode.EventEmitter<
     vscode.CustomDocumentContentChangeEvent<MarkdownDocument>
   >();
@@ -20,8 +21,24 @@ export class MarkdownEditorProvider implements vscode.CustomEditorProvider<Markd
 
   private readonly _webviewPanels = new Map<string, Set<vscode.WebviewPanel>>();
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(context: vscode.ExtensionContext, log?: vscode.OutputChannel) {
     this._context = context;
+    this._log = log;
+    this._context.subscriptions.push(
+      vscode.window.onDidChangeActiveColorTheme((e) => {
+        const theme =
+          e.kind === vscode.ColorThemeKind.Dark
+            ? 'vscode-dark'
+            : e.kind === vscode.ColorThemeKind.HighContrast
+              ? 'vscode-high-contrast'
+              : 'vscode-light';
+        for (const panels of this._webviewPanels.values()) {
+          for (const panel of panels) {
+            panel.webview.postMessage({ type: 'themeChanged', theme });
+          }
+        }
+      })
+    );
   }
 
   async openCustomDocument(
@@ -56,6 +73,7 @@ export class MarkdownEditorProvider implements vscode.CustomEditorProvider<Markd
     webviewPanel.webview.html = getWebviewContent(webviewPanel.webview, scriptUri, { mode: 'markdown' });
 
     const editorConfig = getEditorConfig();
+    this._log?.appendLine(`[Markdown] resolveCustomEditor ${key}`);
     webviewPanel.webview.postMessage({
       type: 'init',
       mode: 'markdown',
@@ -64,6 +82,7 @@ export class MarkdownEditorProvider implements vscode.CustomEditorProvider<Markd
       editorWidth: editorConfig.editorWidth,
       tokenCounterModel: editorConfig.tokenCounterModel,
     });
+    this._log?.appendLine(`[Markdown] sent initial init ${key}`);
 
     webviewPanel.webview.onDidReceiveMessage(
       async (msg: { type: string; content?: string }) => {
@@ -71,7 +90,12 @@ export class MarkdownEditorProvider implements vscode.CustomEditorProvider<Markd
           await vscode.commands.executeCommand('workbench.action.reopenWithEditor');
           return;
         }
+        if (msg.type === 'initAck') {
+          this._log?.appendLine(`[Markdown] webview received init ${key}`);
+          return;
+        }
         if (msg.type === 'webviewReady') {
+          this._log?.appendLine(`[Markdown] webviewReady ${key}, sending init`);
           const editorConfig = getEditorConfig();
           webviewPanel.webview.postMessage({
             type: 'init',

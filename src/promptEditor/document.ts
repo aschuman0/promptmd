@@ -4,6 +4,7 @@ import { parsePromptVariables, type PromptVariable } from './parser';
 /**
  * Mutable prompt entry: same as parser's PromptVariable but rawValue can be updated by the editor.
  * nameStart/nameEnd are undefined for newly added (not-yet-saved) entries.
+ * deleted is true when user chose to delete; entry stays until save so rebuildPyFile can remove its span.
  */
 export interface PromptEntry {
   name: string;
@@ -13,6 +14,7 @@ export interface PromptEntry {
   nameEnd?: number;
   startOffset: number;
   endOffset: number;
+  deleted?: boolean;
 }
 
 function parsedToEntries(parsed: PromptVariable[]): PromptEntry[] {
@@ -91,6 +93,14 @@ export class PromptDocument implements vscode.CustomDocument {
     const entry = this.entries.find((e) => e.name === oldName);
     if (!entry) return false;
     entry.name = newName;
+    return true;
+  }
+
+  /** Mark an entry as deleted (removed from file on next save). */
+  deleteEntry(name: string): boolean {
+    const entry = this.entries.find((e) => e.name === name);
+    if (!entry) return false;
+    entry.deleted = true;
     return true;
   }
 
