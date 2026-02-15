@@ -70,6 +70,44 @@ Only the first assignment to a given name per “prompt variable” block is par
 
 ---
 
+## Installing on your own machine
+
+You can package the extension as a `.vsix` file and install it locally (no marketplace).
+
+### First-time install
+
+1. **Build and package** (from the repo root):
+
+   ```bash
+   npm install
+   npx @vscode/vsce package
+   ```
+
+   This runs the build (compile + webview) and produces `promptmd-0.1.0.vsix` (or the current version in `package.json`).
+
+2. **Install the `.vsix`** in VS Code or Cursor:
+
+   - **UI:** Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`) → **Extensions: Install from VSIX…** → choose the `.vsix` file.
+   - **CLI (VS Code):** `code --install-extension promptmd-0.1.0.vsix`
+   - **CLI (Cursor):** `cursor --install-extension promptmd-0.1.0.vsix`
+
+3. Reload the editor if prompted. Open a `*prompt*.py` file to confirm the Prompt Editor opens.
+
+### Upgrading to a new version
+
+1. Pull or apply your changes, then **bump the version** in `package.json` (e.g. `"version": "0.1.1"`).
+2. Package again:
+
+   ```bash
+   npx @vscode/vsce package
+   ```
+
+   This creates a new `.vsix` (e.g. `promptmd-0.1.1.vsix`).
+
+3. Install the new `.vsix` the same way as above (UI or CLI). It replaces the previously installed version; you don’t need to uninstall first.
+
+---
+
 ## Development
 
 ### Setup
@@ -104,13 +142,7 @@ npm run build:webview
 
 ### Publish / package
 
-Before packaging for distribution, run:
-
-```bash
-npm run compile && npm run build:webview
-```
-
-(`vscode:prepublish` in `package.json` runs the same.)
+To produce a `.vsix` for local or manual install, see **Installing on your own machine**. The command `npx @vscode/vsce package` runs the build automatically via `vscode:prepublish`.
 
 ---
 

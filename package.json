@@ -7,7 +7,9 @@
   "engines": {
     "vscode": "^1.74.0"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "activationEvents": [
     "onCustomEditor:promptmd.promptEditor"
   ],
@@ -40,5 +42,9 @@
     "@types/vscode": "^1.74.0",
     "esbuild": "^0.24.0",
     "typescript": "^5.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aschuman0/promptmd.git"
   }
 }
