@@ -1,11 +1,24 @@
 import * as vscode from 'vscode';
 
+export type WebviewEditorMode = 'prompt' | 'markdown';
+
+export interface GetWebviewContentOptions {
+  mode?: WebviewEditorMode;
+}
+
 /**
- * Builds the HTML for the prompt editor webview: layout, styles, and inline script.
+ * Builds the HTML for the prompt/markdown editor webview: layout, styles, and inline script.
  * Script loads TipTap from scriptUri, handles init/revert/variablesUpdated, and requests state on load (webviewReady).
+ * When mode is 'markdown', tabs and variable UI are hidden; single-document edit with content-only messages.
  */
-export function getWebviewContent(_webview: vscode.Webview, scriptUri: vscode.Uri): string {
+export function getWebviewContent(
+  _webview: vscode.Webview,
+  scriptUri: vscode.Uri,
+  options?: GetWebviewContentOptions
+): string {
+  const mode = options?.mode ?? 'prompt';
   const scriptSrc = scriptUri.toString();
+  const bodyDataMode = mode === 'markdown' ? 'markdown' : 'prompt';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -92,9 +105,22 @@ export function getWebviewContent(_webview: vscode.Webview, scriptUri: vscode.Ur
       overflow: hidden;
     }
     .panel.active { display: flex; }
+    .editor-outer {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      max-width: 122ch;
+      width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+    }
     .editor-wrap {
       flex: 1;
       min-height: 120px;
+      width: 100%;
       overflow: auto;
       border: 1px solid var(--vscode-input-border);
       border-radius: 4px;
@@ -160,6 +186,10 @@ export function getWebviewContent(_webview: vscode.Webview, scriptUri: vscode.Ur
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
     }
+    .format-reopen-btn { margin-left: 4px; }
+    .format-add-btn {
+      margin-left: auto;
+    }
     .promptmd-tiptap-editor {
       min-height: 160px;
       outline: none;
@@ -173,14 +203,16 @@ export function getWebviewContent(_webview: vscode.Webview, scriptUri: vscode.Ur
     .promptmd-tiptap-editor code { background: var(--vscode-textCodeBlock-background); padding: 0.15em 0.4em; border-radius: 3px; font-family: var(--vscode-editor-font-family); font-size: 0.9em; }
     .promptmd-tiptap-editor pre { background: var(--vscode-textCodeBlock-background); padding: 0.75em 1em; border-radius: 4px; overflow-x: auto; margin: 0.5em 0; }
     .promptmd-tiptap-editor pre code { padding: 0; background: none; }
+    .promptmd-tiptap-editor .ProseMirror { max-width: 100%; }
     .loading-state {
       padding: 24px;
       text-align: center;
       color: var(--vscode-descriptionForeground);
     }
+    body[data-mode="markdown"] .tabs { display: none !important; }
   </style>
 </head>
-<body>
+<body data-mode="${bodyDataMode}">
   <script src="${scriptSrc}"></script>
   <div id="loading" class="loading-state">Loading…</div>
   <div id="emptyState" class="empty-state" style="display: none;">
@@ -193,7 +225,8 @@ export function getWebviewContent(_webview: vscode.Webview, scriptUri: vscode.Ur
   <script>
     (function() {
       const vscode = acquireVsCodeApi();
-      let state = { variables: [], validPlaceholderNames: [] };
+      const mode = document.body.getAttribute('data-mode') || 'prompt';
+      let state = { mode: mode, variables: [], validPlaceholderNames: [] };
       let activeIndex = 0;
 
       function hideLoading() {
@@ -222,13 +255,17 @@ export function getWebviewContent(_webview: vscode.Webview, scriptUri: vscode.Ur
         wrap.className = 'editor-wrap';
         const editorEl = document.createElement('div');
         editorEl.className = 'editor';
+        const outer = document.createElement('div');
+        outer.className = 'editor-outer';
+        outer.appendChild(formatBar);
+        outer.appendChild(wrap);
         if (typeof window.initTiptapEditor !== 'function') {
           editorEl.textContent = 'Loading editor...';
           wrap.appendChild(editorEl);
-          panel.appendChild(formatBar);
-          panel.appendChild(wrap);
+          panel.appendChild(outer);
           return panel;
         }
+        const isMarkdown = state.mode === 'markdown';
         const destroy = window.initTiptapEditor({
           toolbarContainer: formatBar,
           editorContainer: editorEl,
@@ -236,17 +273,23 @@ export function getWebviewContent(_webview: vscode.Webview, scriptUri: vscode.Ur
           variableName: v.name,
           onMarkdownChange: function(md) {
             v.content = md;
-            vscode.postMessage({ type: 'edit', variableName: v.name, content: md });
+            if (isMarkdown) {
+              vscode.postMessage({ type: 'edit', content: md });
+            } else {
+              vscode.postMessage({ type: 'edit', variableName: v.name, content: md });
+            }
           },
-          onAddVariable: function() {
+          onAddVariable: isMarkdown ? undefined : function() {
             vscode.postMessage({ type: 'addVariable' });
+          },
+          onReopenInEditor: function() {
+            vscode.postMessage({ type: 'reopenInEditor' });
           },
           validPlaceholderNames: state.validPlaceholderNames,
         });
         panel._destroyTiptap = destroy;
         wrap.appendChild(editorEl);
-        panel.appendChild(formatBar);
-        panel.appendChild(wrap);
+        panel.appendChild(outer);
         return panel;
       }
 
@@ -262,7 +305,7 @@ export function getWebviewContent(_webview: vscode.Webview, scriptUri: vscode.Ur
       }
 
       function render() {
-        if (state.variables.length === 0) {
+        if (state.mode !== 'markdown' && state.variables.length === 0) {
           showEmpty();
           return;
         }
@@ -274,48 +317,59 @@ export function getWebviewContent(_webview: vscode.Webview, scriptUri: vscode.Ur
         });
         tabsEl.innerHTML = '';
         panelsEl.innerHTML = '';
-        state.variables.forEach(function(v, i) {
-          const wrap = document.createElement('div');
-          wrap.className = 'tab-wrap';
-          const tab = document.createElement('button');
-          tab.type = 'button';
-          tab.className = 'tab' + (i === activeIndex ? ' active' : '');
-          tab.textContent = v.name;
-          tab.setAttribute('title', 'Switch to ' + v.name);
-          const renameBtn = document.createElement('button');
-          renameBtn.type = 'button';
-          renameBtn.className = 'tab-rename';
-          renameBtn.setAttribute('title', 'Rename variable');
-          renameBtn.appendChild(makeRenameIcon());
-          renameBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            vscode.postMessage({ type: 'renameVariable', variableName: v.name });
+        if (state.mode === 'markdown') {
+          panelsEl.appendChild(buildEditor(0));
+        } else {
+          state.variables.forEach(function(v, i) {
+            const wrap = document.createElement('div');
+            wrap.className = 'tab-wrap';
+            const tab = document.createElement('button');
+            tab.type = 'button';
+            tab.className = 'tab' + (i === activeIndex ? ' active' : '');
+            tab.textContent = v.name;
+            tab.setAttribute('title', 'Switch to ' + v.name);
+            const renameBtn = document.createElement('button');
+            renameBtn.type = 'button';
+            renameBtn.className = 'tab-rename';
+            renameBtn.setAttribute('title', 'Rename variable');
+            renameBtn.appendChild(makeRenameIcon());
+            renameBtn.addEventListener('click', function(e) {
+              e.stopPropagation();
+              vscode.postMessage({ type: 'renameVariable', variableName: v.name });
+            });
+            tab.addEventListener('click', function() {
+              document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+              document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+              tab.classList.add('active');
+              document.getElementById('panel-' + i).classList.add('active');
+              activeIndex = i;
+            });
+            wrap.appendChild(tab);
+            wrap.appendChild(renameBtn);
+            tabsEl.appendChild(wrap);
+            panelsEl.appendChild(buildEditor(i));
           });
-          tab.addEventListener('click', function() {
-            document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
-            document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
-            tab.classList.add('active');
-            document.getElementById('panel-' + i).classList.add('active');
-            activeIndex = i;
-          });
-          wrap.appendChild(tab);
-          wrap.appendChild(renameBtn);
-          tabsEl.appendChild(wrap);
-          panelsEl.appendChild(buildEditor(i));
-        });
+        }
       }
 
-      window.addEventListener('message', function(event) {
-        const msg = event.data;
-        if (msg.type === 'init' || msg.type === 'revert') {
+      function applyInitOrRevert(msg) {
+        if (msg.mode === 'markdown') {
+          state.variables = [{ name: '', content: msg.content != null ? msg.content : '', isFString: false }];
+          state.validPlaceholderNames = msg.validPlaceholderNames || [];
+        } else {
           state.variables = (msg.variables || []).map(function(v) {
             return { name: v.name, content: v.content, isFString: v.isFString };
           });
           state.validPlaceholderNames = msg.validPlaceholderNames || [];
-          activeIndex = 0;
-          render();
         }
-        if (msg.type === 'variablesUpdated') {
+        activeIndex = 0;
+        render();
+      }
+      function applyVariablesUpdated(msg) {
+        if (msg.mode === 'markdown') {
+          state.variables = [{ name: '', content: msg.content != null ? msg.content : '', isFString: false }];
+          state.validPlaceholderNames = msg.validPlaceholderNames || [];
+        } else {
           const prevLen = state.variables.length;
           state.variables = (msg.variables || []).map(function(v) {
             return { name: v.name, content: v.content, isFString: v.isFString };
@@ -326,7 +380,16 @@ export function getWebviewContent(_webview: vscode.Webview, scriptUri: vscode.Ur
           } else if (activeIndex >= state.variables.length) {
             activeIndex = Math.max(0, state.variables.length - 1);
           }
-          render();
+        }
+        render();
+      }
+      window.addEventListener('message', function(event) {
+        const msg = event.data;
+        if (msg.type === 'init' || msg.type === 'revert') {
+          applyInitOrRevert(msg);
+        }
+        if (msg.type === 'variablesUpdated') {
+          applyVariablesUpdated(msg);
         }
       });
       function sendReadyWhenEditorLoaded() {

@@ -127,6 +127,16 @@ npm run build:webview
 2. Press **F5** or use **Run and Debug** → **Launch Extension**.
 3. A new window opens with the extension loaded. Open a file matching `*prompt*.py` (e.g. from the `examples/` folder) to use the Prompt Editor.
 
+### Auto-reload during development
+
+Run one command to watch both the TypeScript extension and the webview bundle; they will rebuild on save:
+
+```bash
+npm run dev
+```
+
+Then press **F5** to launch the Extension Development Host. After you change extension or webview code, the watchers rebuild automatically. Reload the Extension Development Host window (**Cmd+Shift+F5** or the reload button in the toolbar) to load the new code.
+
 ### Project layout
 
 | Path | Purpose |
@@ -143,6 +153,12 @@ npm run build:webview
 ### Publish / package
 
 To produce a `.vsix` for local or manual install, see **Installing on your own machine**. The command `npx @vscode/vsce package` runs the build automatically via `vscode:prepublish`.
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ---
 

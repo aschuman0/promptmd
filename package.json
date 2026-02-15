@@ -11,7 +11,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onCustomEditor:promptmd.promptEditor"
+    "onCustomEditor:promptmd.promptEditor",
+    "onCustomEditor:promptmd.markdownEditor"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -25,6 +26,16 @@
           }
         ],
         "priority": "default"
+      },
+      {
+        "viewType": "promptmd.markdownEditor",
+        "displayName": "Markdown Editor (PromptMD)",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ],
+        "priority": "default"
       }
     ]
   },
@@ -32,9 +43,12 @@
     "vscode:prepublish": "npm run compile && npm run build:webview",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "build:webview": "esbuild webview/editor.ts --bundle --format=iife --outfile=media/editor.js --minify"
+    "build:webview": "esbuild webview/editor.ts --bundle --format=iife --outfile=media/editor.js --minify",
+    "build:webview:watch": "esbuild webview/editor.ts --bundle --format=iife --outfile=media/editor.js --watch",
+    "dev": "concurrently -n ts,webview \"npm run watch\" \"npm run build:webview:watch\""
   },
   "devDependencies": {
+    "concurrently": "^9.0.0",
     "@tiptap/core": "^3.19.0",
     "@tiptap/markdown": "^3.19.0",
     "@tiptap/starter-kit": "^3.19.0",

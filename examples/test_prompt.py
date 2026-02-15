@@ -22,3 +22,5 @@ OTHER_VAR = """Plain triple-quoted string.
 With multiple lines.
 
 test for a {{fstring}} """
+
+NEW_PROMPT = """&nbsp;"""

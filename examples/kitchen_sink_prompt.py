@@ -2,7 +2,9 @@
 
 FULL_DEMO = """# Heading 1: The Grand Tour
 
-This paragraph has **bold** and *italic* and `inline code` in the same sentence. You can also use **_bold italic_** for emphasis.
+This paragraph has **bold** and *italic* and `inline code` in the same sentence. You can also use ***bold italic*** for emphasis.
+
+&nbsp;
 
 ## Heading 2: Lists and Structure
 
@@ -25,16 +27,20 @@ And an ordered list:
 2. Step two
 3. Step three
 
+&nbsp;
+
 ### Heading 3: Code
 
 Use the `print()` function for output. For longer snippets:
 
 ```
 def greet(name):
-    return f"Hello, {name}!"
+    return f\"Hello, {name}!\"
 ```
 
 That was a **code block**. Back to normal text with *emphasis* and a [link](https://example.com).
+
+&nbsp;
 
 ## Heading 2: Recap
 
@@ -44,12 +50,14 @@ That was a **code block**. Back to normal text with *emphasis* and a [link](http
 - Bullet and numbered lists
 - Headings 1, 2, 3
 - Mix and match in one prompt
-"""
+
+&nbsp;"""
 
 F_STRING_MIX = f"""# Dynamic prompt
 
 Use placeholders like {{user_name}} and {{task_id}} in your response.
 
 - Item with {{placeholder}}
-- Another {{count}} items
-"""
+- Another {{count}} items 
+
+&nbsp;"""

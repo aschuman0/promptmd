@@ -49,13 +49,13 @@ export class PromptEditorProvider implements vscode.CustomEditorProvider<PromptD
     _token: vscode.CancellationToken
   ): void {
     const key = document.uri.toString();
-    let set = this._webviewPanels.get(key);
-    if (!set) {
-      set = new Set();
-      this._webviewPanels.set(key, set);
+    let panelSet = this._webviewPanels.get(key);
+    if (!panelSet) {
+      panelSet = new Set();
+      this._webviewPanels.set(key, panelSet);
     }
-    set.add(webviewPanel);
-    webviewPanel.onDidDispose(() => set!.delete(webviewPanel));
+    panelSet.add(webviewPanel);
+    webviewPanel.onDidDispose(() => this._webviewPanels.get(key)?.delete(webviewPanel));
 
     webviewPanel.webview.options = {
       enableScripts: true,
@@ -80,7 +80,11 @@ export class PromptEditorProvider implements vscode.CustomEditorProvider<PromptD
     };
 
     webviewPanel.webview.onDidReceiveMessage(
-      async (msg: { type: string; variableName?: string; content?: string; newName?: string }) => {
+      async (msg: { type: string; variableName?: string; content?: string }) => {
+        if (msg.type === 'reopenInEditor') {
+          await vscode.commands.executeCommand('workbench.action.reopenWithEditor');
+          return;
+        }
         if (msg.type === 'webviewReady') {
           webviewPanel.webview.postMessage({
             type: 'init',

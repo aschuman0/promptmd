@@ -93,6 +93,8 @@ export interface InitTiptapEditorOptions {
   variableName: string;
   onMarkdownChange: (markdown: string) => void;
   onAddVariable?: () => void;
+  /** Trigger "Reopen Editor With..." picker for the current file. */
+  onReopenInEditor?: () => void;
   /** Names in scope in the Python file; only these get valid placeholder styling. */
   validPlaceholderNames?: string[];
 }
@@ -105,6 +107,7 @@ export function initTiptapEditor(options: InitTiptapEditorOptions): () => void {
     variableName,
     onMarkdownChange,
     onAddVariable,
+    onReopenInEditor,
     validPlaceholderNames = [],
   } = options;
 
@@ -229,19 +232,31 @@ export function initTiptapEditor(options: InitTiptapEditorOptions): () => void {
   toolbarContainer.appendChild(btn(icons.bulletList, 'bulletList', 'Bullet list', () => editor.chain().focus().toggleBulletList().run()));
   toolbarContainer.appendChild(btn(icons.orderedList, 'orderedList', 'Numbered list', () => editor.chain().focus().toggleOrderedList().run()));
 
-  if (onAddVariable) {
+  if (onReopenInEditor || onAddVariable) {
     const spacer = document.createElement('div');
     spacer.className = 'format-bar-spacer';
     spacer.style.flex = '1';
     toolbarContainer.appendChild(spacer);
-    const plusIcon = icon('<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>');
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'format-btn format-add-btn';
-    addBtn.setAttribute('title', 'Add new prompt variable');
-    addBtn.appendChild(plusIcon);
-    addBtn.addEventListener('click', () => onAddVariable());
-    toolbarContainer.appendChild(addBtn);
+    if (onAddVariable) {
+      const plusIcon = icon('<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>');
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'format-btn format-add-btn';
+      addBtn.setAttribute('title', 'Add new prompt variable');
+      addBtn.appendChild(plusIcon);
+      addBtn.addEventListener('click', () => onAddVariable());
+      toolbarContainer.appendChild(addBtn);
+    }
+    if (onReopenInEditor) {
+      const reopenIcon = icon('<path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>');
+      const reopenBtn = document.createElement('button');
+      reopenBtn.type = 'button';
+      reopenBtn.className = 'format-btn format-reopen-btn';
+      reopenBtn.setAttribute('title', 'Reopen in another editor');
+      reopenBtn.appendChild(reopenIcon);
+      reopenBtn.addEventListener('click', () => onReopenInEditor());
+      toolbarContainer.appendChild(reopenBtn);
+    }
   }
 
   function syncSelect() {

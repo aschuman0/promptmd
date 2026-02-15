@@ -16,8 +16,7 @@ def example():
     return "formatted correctly"
 ```
 
-Mention that they can run it with `python script.py`. Use *italic* for emphasis when pointing out common mistakes.
-"""
+Mention that they can run it with `python script.py`. Use *italic* for emphasis when pointing out common mistakes."""
 
 PYTHON_EXAMPLE = """# Python Snippet
 

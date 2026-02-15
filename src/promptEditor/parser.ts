@@ -24,6 +24,28 @@ export interface PromptVariable {
 const TRIPLE_DQ = '"""';
 const TRIPLE_SQ = "'''";
 
+/**
+ * Unescapes raw content from a Python triple-quoted string into the actual string value.
+ * In Python, only \\ and the delimiter quote are escaped (e.g. \\ -> \, \" -> ").
+ * Without this, we store raw source and re-escape on save, doubling backslashes each time.
+ */
+function unescapePythonTripleQuoted(raw: string, useDoubleQuote: boolean): string {
+  const quote = useDoubleQuote ? '"' : "'";
+  let out = '';
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === '\\' && i + 1 < raw.length) {
+      const next = raw[i + 1];
+      if (next === '\\' || next === quote) {
+        out += next;
+        i++;
+        continue;
+      }
+    }
+    out += raw[i];
+  }
+  return out;
+}
+
 export function parsePromptVariables(source: string): PromptVariable[] {
   const results: PromptVariable[] = [];
   let i = 0;
@@ -128,7 +150,8 @@ export function parsePromptVariables(source: string): PromptVariable[] {
       break;
     }
 
-    const rawValue = isFString ? content.replace(/\{\{/g, '{').replace(/\}\}/g, '}') : content;
+    const decoded = unescapePythonTripleQuoted(content, isDouble);
+    const rawValue = isFString ? decoded.replace(/\{\{/g, '{').replace(/\}\}/g, '}') : decoded;
     results.push({
       name,
       rawValue,
